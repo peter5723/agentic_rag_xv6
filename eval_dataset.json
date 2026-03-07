@@ -1,0 +1,102 @@
+[
+  {
+    "question": "xv6 的 kalloc() 函数是如何管理空闲物理内存页的？",
+    "expected_answer": "kalloc 使用一个由 kmem.lock 保护的空闲链表 (freelist) 来管理内存。每个空闲的物理页的开头被强转为 struct run 指针，指向下一个空闲页。",
+    "source_file": "kalloc.c"
+  },
+  {
+    "question": "walkpgdir() 函数的作用是什么？如果传入的 alloc 参数为 1 会发生什么？",
+    "expected_answer": "walkpgdir 用于查找虚拟地址对应的页表项 (PTE)。如果 alloc=1 且页目录项 (PDE) 不存在，它会调用 kalloc 分配一个新的物理页作为页表，并初始化为 0。",
+    "source_file": "vm.c"
+  },
+  {
+    "question": "xv6 x86 版本中，内核被映射到了虚拟地址空间的什么位置？(KERNBASE)",
+    "expected_answer": "内核代码和数据从虚拟地址 KERNBASE (0x80000000) 开始映射，对应物理地址的 0 处。",
+    "source_file": "memlayout.h"
+  },
+  {
+    "question": "简述 xv6 中 scheduler() 函数进行进程切换的核心循环流程。",
+    "expected_answer": "scheduler 会遍历 ptbl.proc 数组寻找状态为 RUNNABLE 的进程。找到后，将其状态改为 RUNNING，然后调用 swtch() 函数保存调度器的上下文并恢复目标进程的上下文。",
+    "source_file": "proc.c"
+  },
+  {
+    "question": "fork() 系统调用是如何复制父进程的内存空间的？调用的底层函数是什么？",
+    "expected_answer": "fork 会调用 copyuvm()。copyuvm 遍历父进程的页表，为每个有效的 PTE 调用 kalloc 分配新的物理页，将父进程物理页的数据 memmove 到新物理页，并将其映射到子进程的页表中。",
+    "source_file": "vm.c"
+  },
+  {
+    "question": "当进程调用 exit() 时，它的资源会立刻被全部释放吗？为什么？",
+    "expected_answer": "不会。进程状态会被设为 ZOMBIE（僵尸进程），它会释放大部分内存和打开的文件，但会保留 struct proc 结构体、进程内核栈和 PID，直到其父进程调用 wait() 来彻底回收它。",
+    "source_file": "proc.c"
+  },
+  {
+    "question": "当用户态程序执行 int 指令触发系统调用时，硬件会自动跳转到哪个汇编入口点？",
+    "expected_answer": "硬件会根据 IDT 跳转到 vector 对应的中断入口，随后统一跳转到 alltraps 汇编标签，在那里保存寄存器上下文。",
+    "source_file": "trapasm.S"
+  },
+  {
+    "question": "ide 磁盘驱动 (ide.c) 中，是如何处理磁盘读写请求队列的？",
+    "expected_answer": "ide 驱动维护了一个由 idequeue 构成的请求队列。iderw() 函数将新的 buf 请求追加到队列尾部，如果磁盘空闲，则调用 idestart() 发送真实的硬件指令 (如 IDE_CMD_READ)。",
+    "source_file": "ide.c"
+  },
+  {
+    "question": "在获取自旋锁 (acquire) 时，为什么要先调用 pushcli() 关闭本地 CPU 的中断？",
+    "expected_answer": "为了防止死锁。如果获取自旋锁后发生时钟中断，中断处理程序若也试图获取该锁，就会因为锁已被当前 CPU 的被中断上下文持有而发生永久自旋。",
+    "source_file": "spinlock.c"
+  },
+  {
+    "question": "sleep() 函数需要传入一个锁参数 (通常是保护等待条件的锁)，为什么在休眠前需要这个锁？",
+    "expected_answer": "为了避免丢失唤醒 (Lost Wakeup) 问题。sleep 需要在释放这个锁和将进程状态设为 SLEEPING 之间保持原子性，防止在即将休眠的间隙，另一个 CPU 调用了 wakeup。",
+    "source_file": "proc.c"
+  },
+  {
+    "question": "sleeplock (睡眠锁) 和 spinlock (自旋锁) 的核心区别是什么？",
+    "expected_answer": "获取自旋锁失败时 CPU 会死循环等待；而获取睡眠锁失败时，进程会让出 CPU 进入睡眠状态 (SLEEPING)。因此自旋锁期间不能发生上下文切换，而睡眠锁可以。",
+    "source_file": "sleeplock.c"
+  },
+  {
+    "question": "xv6 的 buffer cache (bcache) 采用什么块替换策略？是如何用代码实现的？",
+    "expected_answer": "采用 LRU 策略。通过一个双向链表实现。每次 brelse 释放一个 buffer 时，会将其移动到链表头部 (bcache.head.next)。分配时从链表尾部向前查找空闲块。",
+    "source_file": "bio.c"
+  },
+  {
+    "question": "什么是 inode？struct dinode 中包含哪些信息？",
+    "expected_answer": "inode 是文件系统中的索引节点。它包含文件类型、主次设备号、链接数 (nlink)、文件大小 (size) 以及存储文件数据的直接和间接物理盘块号数组 (addrs)。",
+    "source_file": "fs.h"
+  },
+  {
+    "question": "一个 xv6 文件的最大大小限制是多少个数据块？",
+    "expected_answer": "因为 inode 包含 NDIRECT (12) 个直接块，和 1 个一级间接块。间接块包含 NINDIRECT (128) 个块号。总计 12 + 128 = 140 块 (MAXFILE)。",
+    "source_file": "fs.h"
+  },
+  {
+    "question": "xv6 中的 pipe (管道) 是如何解决读写同步问题的？",
+    "expected_answer": "pipe 使用一个环形缓冲区存储数据。当缓冲区满时，写进程会调用 sleep 挂起；当缓冲区空时，读进程会 sleep 挂起。读写操作完成后会相互调用 wakeup 唤醒对方。",
+    "source_file": "pipe.c"
+  },
+  {
+    "question": "内核在启动时，第一个运行的用户态进程是通过哪个汇编文件加载的？",
+    "expected_answer": "是通过 initcode.S 编译生成的二进制机器码。内核在 userinit() 函数中手动将这段机器码拷贝到了第一个进程的内存空间中。",
+    "source_file": "initcode.S"
+  },
+  {
+    "question": "exec() 系统调用在加载 ELF 可执行文件时，如果发现内存不足，它是怎么处理的？",
+    "expected_answer": "如果加载失败，它会跳转到 bad 标签，调用 freevm() 释放已经为新程序分配的所有页表和物理内存，并返回 -1。",
+    "source_file": "exec.c"
+  },
+  {
+    "question": "x86 架构下，xv6 是如何初始化全局描述符表 (GDT) 和任务状态段 (TSS) 的？",
+    "expected_answer": "在 tvinit() 和 seginit() 函数中，为每个 CPU 初始化 GDT，包含内核代码/数据段和用户代码/数据段，并在 TSS 中设置好内核栈的 SS0 和 ESP0，用于陷入内核时切换栈。",
+    "source_file": "vm.c"
+  },
+  {
+    "question": "父进程调用 wait() 时，如果子进程还没有退出，父进程会处于什么状态？",
+    "expected_answer": "父进程会调用 sleep 将自己挂起，进入 SLEEPING 状态，直到任意一个子进程调用 exit() 时触发 wakeup() 将其唤醒。",
+    "source_file": "proc.c"
+  },
+  {
+    "question": "多核处理器下，每个 CPU 独有的数据结构 struct cpu 保存在哪里？",
+    "expected_answer": "为了快速访问当前 CPU 的信息，xv6 利用了 x86 的段寄存器机制。在 mpmain() 中，将 CPU 的局部数据存放并用 %gs 寄存器指向它，通过 mycpu() 函数获取。",
+    "source_file": "proc.c"
+  }
+]
