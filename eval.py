@@ -8,7 +8,7 @@ os.environ["NO_PROXY"] = "localhost,127.0.0.1,0.0.0.0"
 # 导入你构建好的 LangGraph Agent
 from agent_graph import app
 
-def run_evaluation(dataset_path="eval_dataset.json", output_path="eval_results_baseline.json"):
+def run_evaluation(dataset_path="eval_dataset.json", output_path="eval_results_baseline.json"):# eval_results_sft.json eval_results_baseline.json
     print(f"🚀 开始加载评测集: {dataset_path}")
     
     with open(dataset_path, "r", encoding="utf-8") as f:

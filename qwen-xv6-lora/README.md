@@ -8,8 +8,8 @@ tags:
 - transformers
 - trl
 licence: license
-base_model: models/qwen-7b
 pipeline_tag: text-generation
+base_model: models/qwen-7b
 ---
 
 # Model Card for qwen-xv6-lora

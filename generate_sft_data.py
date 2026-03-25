@@ -7,7 +7,7 @@ from tqdm import tqdm
 # --- 配置区域 ---
 LLM_API_BASE = "http://localhost:8000/v1"
 LLM_API_KEY = "EMPTY"
-SEED_FILE = "eval_dataset.json"
+SEED_FILE = "train_seed.json"
 OUTPUT_FILE = "xv6_sft_train_data.jsonl"
 KB_FILE = "xv6_kb.jsonl" # 用于抽取负样本
 
@@ -32,7 +32,7 @@ def get_llm_response(prompt):
     )
     return response.choices[0].message.content.strip()
 
-print(f"🚀 开始数据增强，目标：将 {len(seeds)} 条种子扩展至约 100-200 条...")
+print(f"🚀 开始数据增强，目标：将 {len(seeds)} 条种子扩展至约 2000 条...")
 
 augmented_data = []
 
@@ -42,10 +42,12 @@ for item in tqdm(seeds):
     correct_file = item['source_file']
     
     # --- 策略 A: 指令多样化 (Rewriting) ---
-    rewrite_prompt = f"请将以下关于 xv6 内核的问题改写成 3 种不同的询问方式，保持原意不变，直接输出改写后的问题，每行一个：\n{question}"
+    # 1. 修改 Prompt：明确禁止模型输出序号
+    rewrite_prompt = f"请将以下关于 xv6 内核的问题改写成 5 种不同的询问方式，保持原意不变，直接输出改写后的问题，每行一个。注意：必须纯文本输出，绝对不要带任何序号（如 1. 2. 3.）、前缀或破折号：\n{question}"
     variants = get_llm_response(rewrite_prompt).split('\n')
-    all_questions = [question] + [v.strip() for v in variants if v.strip()]
-
+    
+    # 2. 增加代码兜底：使用 lstrip 强制剔除可能残留的数字、点和空格
+    all_questions = [question] + [v.lstrip('0123456789.、- ').strip() for v in variants if v.strip()]
     for q in all_questions:
         # --- 策略 B: 构造 RAFT 负样本 (Distractors) ---
         # 随机抽取 2 个不相关的代码片段作为干扰

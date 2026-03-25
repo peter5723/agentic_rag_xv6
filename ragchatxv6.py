@@ -125,7 +125,7 @@ class RAGSystem:
                 # 拼接 Prompt
                 context_str = "\n\n".join([f"// Source File: {r['file']}\n{r['text']}" for r in context_results])
                 
-                system_prompt = """你是一个操作系统内核专家，精通 xv6 源码 (RISC-V版)。
+                system_prompt = """你是一个操作系统内核专家，精通 xv6 源码 (x86版)。
 请根据提供的【代码片段】回答用户问题。
 要求：
 1. 回答必须基于提供的代码逻辑。

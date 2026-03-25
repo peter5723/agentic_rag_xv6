@@ -8,21 +8,21 @@
     ],
     "is_hit": true,
     "expected_answer": "kalloc 使用一个由 kmem.lock 保护的空闲链表 (freelist) 来管理内存。每个空闲的物理页的开头被强转为 struct run 指针，指向下一个空闲页。",
-    "generated_answer": "Xv6 的 `kalloc()` 函数通过一个名为 `kmem` 的数据结构来管理空闲物理内存页。这个结构包含一个 `spinlock` 锁（`lock`）用于同步访问空闲列表，以及两个成员：`use_lock` 表示是否启用锁定机制（在初始化阶段），以及`freelist`，指向当前可用页面的链表。\n\n当需要分配内存时，`kalloc()` 首先检查给定的虚拟地址 `v` 是否符合分配条件，即它不是 PGSIZE 的倍数，不在结束标记 `end` 之后，且不是物理内存的最高地址 `PHYSTOP`。如果这些条件不满足，函数会调用 `panic` 来报告错误。\n\n如果 `v` 满足条件，`kalloc()` 会使用 `memset` 填充 `v` 处理器缓存大小（PGSIZE，通常是 4KB）的内存，以防止悬挂引用（dangling refs）。然后，它会尝试获取 `kmem.lock` 锁来更新空闲列表。将 `r` 指针指向新分配的页面，并将其插入到 `freelist` 链表的末尾。释放锁后，函数返回 `r`，即已分配的物理内存地址。\n\n在初始化阶段，`kinit1()` 和 `kinit2()` 分别处理不同的内存范围。`kinit1()` 只将由 `entrypgdir` 调整过的页面添加到空闲列表，而 `kinit2()` 则会处理剩余的所有物理页，并启用锁定以确保并发安全。`freerange()` 函数遍历给定的内存区间，对每个 PGSIZE 大小的页调用 `kfree()` 进行释放。",
-    "latency_seconds": 19.71
+    "generated_answer": "Error: Error code: 404 - {'error': {'message': 'The model `xv6-expert` does not exist.', 'type': 'NotFoundError', 'param': None, 'code': 404}}",
+    "latency_seconds": 0.8
   },
   {
     "id": 2,
     "question": "walkpgdir() 函数的作用是什么？如果传入的 alloc 参数为 1 会发生什么？",
     "expected_source": "vm.c",
     "retrieved_files": [
-      "vm.c",
-      "main.c"
+      "proc.c",
+      "vm.c"
     ],
     "is_hit": true,
     "expected_answer": "walkpgdir 用于查找虚拟地址对应的页表项 (PTE)。如果 alloc=1 且页目录项 (PDE) 不存在，它会调用 kalloc 分配一个新的物理页作为页表，并初始化为 0。",
-    "generated_answer": "walkpgdir() 函数的作用是查找并返回与给定虚拟地址 (va) 相对应的页表项 (PTE)。如果 alloc=1，它还会在必要时创建任何缺失的页表页面。这个函数通过遍历页目录 (pgdir) 来实现这一目标，检查每个 PDE（Page Directory Entry）以找到对应的 PTE。\n\n如果 alloc=1，当遇到不存在的 PTE 时，walkpgdir 会动态地分配一个新的物理页作为页表页，并将其初始化为 PTE_NULL（表示该页未被使用）。这通常发生在用户空间程序请求访问不存在的内存地址时。然后，它会将新分配的页表页的 PTE 设置为 PTE_PROT_READ|PTE_PROT_WRITE，以便后续的指令可以正确地映射和访问这个新的物理页。",
-    "latency_seconds": 13.0
+    "generated_answer": "Error: Error code: 404 - {'error': {'message': 'The model `xv6-expert` does not exist.', 'type': 'NotFoundError', 'param': None, 'code': 404}}",
+    "latency_seconds": 0.42
   },
   {
     "id": 3,
@@ -34,61 +34,61 @@
     ],
     "is_hit": true,
     "expected_answer": "内核代码和数据从虚拟地址 KERNBASE (0x80000000) 开始映射，对应物理地址的 0 处。",
-    "generated_answer": "在提供的代码片段中，Xv6内核被映射到了虚拟地址空间的`KERNBASE`位置。具体来说，KERNBASE被定义为0x80000000，这是所有kernel空间开始的虚拟地址点。",
-    "latency_seconds": 4.39
+    "generated_answer": "Error: Error code: 404 - {'error': {'message': 'The model `xv6-expert` does not exist.', 'type': 'NotFoundError', 'param': None, 'code': 404}}",
+    "latency_seconds": 0.25
   },
   {
     "id": 4,
     "question": "简述 xv6 中 scheduler() 函数进行进程切换的核心循环流程。",
     "expected_source": "proc.c",
     "retrieved_files": [
-      "vm.c",
-      "proc.c"
+      "proc.c",
+      "vm.c"
     ],
     "is_hit": true,
     "expected_answer": "scheduler 会遍历 ptbl.proc 数组寻找状态为 RUNNABLE 的进程。找到后，将其状态改为 RUNNING，然后调用 swtch() 函数保存调度器的上下文并恢复目标进程的上下文。",
-    "generated_answer": "Xv6 中的 scheduler() 函数是内核级的进程调度器，它负责管理和切换CPU上的进程执行。以下是scheduler()函数的核心循环流程分析：\n\n1. 获取当前CPU的信息：`struct cpu *c = mycpu();`，获取当前CPU的上下文。\n2. 初始化：将当前CPU关联的进程指针 `c->proc` 设置为0，表示尚未选择要运行的进程。\n3. 进入无限循环：`for(;;)`，循环持续执行，直到中断或其他条件触发进程切换。\n4. 启用中断处理：`sti()`，在每次迭代开始时恢复处理器的中断处理能力，以便在切换过程中处理可能发生的中断请求。\n5. 遍历进程表：`acquire(&ptable.lock);` 使用互斥锁保护ptable结构，确保线程安全。遍历`ptable.proc`数组，查找处于RUNNABLE状态（即，还未开始执行）的进程。\n6. 如果找到可运行进程：将选中的进程信息保存到`c->proc`，这通常涉及更新进程状态和上下文。\n7. 进行进程切换：调用`switchuvm(p)`来更新进程的用户态上下文，包括页表项，然后跳转到该进程的`p->context`，这通常是通过`swtch()`函数完成的，它会保存调度器的上下文并恢复目标进程的上下文。\n8. 最后，调用`switchkvm()`来切换到专门为内核保留的页表，这确保了在没有用户态程序运行时，硬件页表指向正确的地址空间。\n\n总结来说，scheduler()函数的核心任务是在进程表中找到一个待运行的进程，更新其状态，然后通过系统调用切换进程上下文，从而实现进程的调度和执行。这个过程是循环进行的，直到新的进程运行完毕或者有其他中断发生。",
-    "latency_seconds": 11.4
+    "generated_answer": "Error: Error code: 404 - {'error': {'message': 'The model `xv6-expert` does not exist.', 'type': 'NotFoundError', 'param': None, 'code': 404}}",
+    "latency_seconds": 0.23
   },
   {
     "id": 5,
     "question": "fork() 系统调用是如何复制父进程的内存空间的？调用的底层函数是什么？",
     "expected_source": "vm.c",
     "retrieved_files": [
-      "fs.c",
       "proc.c"
     ],
     "is_hit": false,
     "expected_answer": "fork 会调用 copyuvm()。copyuvm 遍历父进程的页表，为每个有效的 PTE 调用 kalloc 分配新的物理页，将父进程物理页的数据 memmove 到新物理页，并将其映射到子进程的页表中。",
-    "generated_answer": "在xv6内核中，fork()系统调用通过`copyuvm()`函数来复制父进程的内存空间。这个函数用于从一个用户态进程的页表（pgdir）中复制物理页到一个新的进程的页表中。具体步骤如下：\n\n1. `forkret`函数中，首先检查`np`是否成功分配，如果`np = allocproc()`返回0表示分配失败，直接返回-1。\n2. 如果`np`分配成功，接下来获取当前进程的页目录（pgdir）和大小（sz）。\n3. 使用`copyuvm`函数，它会遍历`curproc->pgdir`中的每个物理页，如果页有效（即，不在PDE或PTE的`ZOMBIE`或`FREE`状态），则创建一个新的物理页并将其内容复制过来。同时，如果页映射成功，更新新进程的页表结构。\n4. 最后，设置新进程的初始状态（UNUSED），清除`eax`寄存器以确保`fork`返回0，并将其他相关信息（如tf、parent等）复制。\n\n因此，`copyuvm`是实现fork过程中内存空间复制的关键函数。",
-    "latency_seconds": 18.62
+    "generated_answer": "Error: Error code: 404 - {'error': {'message': 'The model `xv6-expert` does not exist.', 'type': 'NotFoundError', 'param': None, 'code': 404}}",
+    "latency_seconds": 0.24
   },
   {
     "id": 6,
     "question": "当进程调用 exit() 时，它的资源会立刻被全部释放吗？为什么？",
     "expected_source": "proc.c",
     "retrieved_files": [
-      "trap.c",
-      "spinlock.c",
-      "defs.h"
+      "proc.c",
+      "usertests.c",
+      "trap.c"
     ],
-    "is_hit": false,
+    "is_hit": true,
     "expected_answer": "不会。进程状态会被设为 ZOMBIE（僵尸进程），它会释放大部分内存和打开的文件，但会保留 struct proc 结构体、进程内核栈和 PID，直到其父进程调用 wait() 来彻底回收它。",
-    "generated_answer": "不会。当进程调用 exit() 时，它不会立即释放所有资源。根据代码逻辑，如果进程在用户态（DPL_USER）且被标记为 killed（即已结束），`exit()` 会被调用。然而，这里并没有直接说明 exit() 会释放资源，特别是针对spinlock的锁定。\n\n在用户态执行的 exit() 通常用于终止程序并返回控制权给操作系统，但它的主要作用是结束进程，而不是释放特定的内存或锁。释放资源（如锁）通常是在内核空间，由专门的函数如 `release()` 执行。因此，尽管进程状态发生变化，但它不会自动释放已经获得的 spinlock。要释放锁，需要手动调用 `release(lk)`。\n\n总结：进程调用 exit() 时不会立刻释放资源，包括 spinlock，除非在退出前通过 `release()` 函数手动释放。",
-    "latency_seconds": 15.19
+    "generated_answer": "Error: Error code: 404 - {'error': {'message': 'The model `xv6-expert` does not exist.', 'type': 'NotFoundError', 'param': None, 'code': 404}}",
+    "latency_seconds": 0.22
   },
   {
     "id": 7,
     "question": "当用户态程序执行 int 指令触发系统调用时，硬件会自动跳转到哪个汇编入口点？",
     "expected_source": "trapasm.S",
     "retrieved_files": [
-      "main.c",
-      "mmu.h"
+      "user.h",
+      "mmu.h",
+      "init.c"
     ],
     "is_hit": false,
     "expected_answer": "硬件会根据 IDT 跳转到 vector 对应的中断入口，随后统一跳转到 alltraps 汇编标签，在那里保存寄存器上下文。",
-    "generated_answer": "在提供的代码中，当用户态程序执行 `int` 指令触发系统调用时，硬件会自动跳转到 `mpenter` 汇编入口点。这个入口点位于 `entryother.S` 文件中。在 `mpenter` 函数中，通过 `switchkvm()`、`seginit()`、`lapicinit()` 和 `scheduler()` 等操作来初始化内核服务和调度进程。",
-    "latency_seconds": 12.34
+    "generated_answer": "Error: Error code: 404 - {'error': {'message': 'The model `xv6-expert` does not exist.', 'type': 'NotFoundError', 'param': None, 'code': 404}}",
+    "latency_seconds": 0.24
   },
   {
     "id": 8,
@@ -99,8 +99,8 @@
     ],
     "is_hit": true,
     "expected_answer": "ide 驱动维护了一个由 idequeue 构成的请求队列。iderw() 函数将新的 buf 请求追加到队列尾部，如果磁盘空闲，则调用 idestart() 发送真实的硬件指令 (如 IDE_CMD_READ)。",
-    "generated_answer": "在ide.c中，ide驱动通过一个名为`idequeue`的静态双向链表来管理磁盘读写请求队列。这个链表存储了待处理的`struct buf`结构体，每个节点代表一个磁盘操作请求。\n\n1. `ideintr()`是中断处理程序，它首先在`idelock`锁的保护下检查`idequeue`是否为空。如果为空，说明没有待处理的请求，直接返回。\n\n2. 如果`idequeue`不为空，ide会获取`idelock`锁，将当前的`buf`（即`idequeue`指向的请求）设为活动请求，并更新`idequeue`指针指向下一个待处理的请求。\n\n3. 对于读取操作，如果当前请求不是脏数据（即`b->flags & B_DIRTY`为0），并且调用`idewait(1)`成功（即磁盘准备好），则使用`insl`函数将数据从IDE设备读入到内存的相应位置。\n\n4. 最后，为了唤醒等待这个磁盘请求完成的进程，ide将`b->flags`设置为`B_VALID`，清除`B_DIRTY`标志，并调用`wakeup(b)`来通知等待的进程。\n\n总结来说，ide驱动维护了一个环形的请求队列，每次IDE中断到来时，它会检查并处理队列中的下一个请求，确保数据的正确传输，并通过信号机制唤醒等待的进程。",
-    "latency_seconds": 22.75
+    "generated_answer": "Error: Error code: 404 - {'error': {'message': 'The model `xv6-expert` does not exist.', 'type': 'NotFoundError', 'param': None, 'code': 404}}",
+    "latency_seconds": 0.24
   },
   {
     "id": 9,
@@ -111,49 +111,47 @@
     ],
     "is_hit": true,
     "expected_answer": "为了防止死锁。如果获取自旋锁后发生时钟中断，中断处理程序若也试图获取该锁，就会因为锁已被当前 CPU 的被中断上下文持有而发生永久自旋。",
-    "generated_answer": "在获取自旋锁 (acquire) 时关闭中断是为了避免发生死锁。自旋锁是一种基于条件的互斥机制，当一个进程试图获取锁但失败时，它会一直循环等待，直到锁被释放。如果在这个过程中，其他CPU尝试访问该锁并也遇到相同的条件，就会发生无限循环的自旋。\n\n中断可能会打断这个循环，使得当前CPU在获取锁之前被其他中断处理程序抢占，导致锁的正确获取顺序被打乱。为防止这种情况，通过 pushcli() 关闭中断可以确保在自旋期间不会收到中断请求，从而保证了锁的原子性和一致性。当锁获取成功后，再通过 popcli() 重新启用中断。",
-    "latency_seconds": 7.04
+    "generated_answer": "Error: Error code: 404 - {'error': {'message': 'The model `xv6-expert` does not exist.', 'type': 'NotFoundError', 'param': None, 'code': 404}}",
+    "latency_seconds": 0.24
   },
   {
     "id": 10,
     "question": "sleep() 函数需要传入一个锁参数 (通常是保护等待条件的锁)，为什么在休眠前需要这个锁？",
     "expected_source": "proc.c",
     "retrieved_files": [
+      "proc.c",
       "sleeplock.c",
-      "proc.c"
+      "fs.c"
     ],
     "is_hit": true,
     "expected_answer": "为了避免丢失唤醒 (Lost Wakeup) 问题。sleep 需要在释放这个锁和将进程状态设为 SLEEPING 之间保持原子性，防止在即将休眠的间隙，另一个 CPU 调用了 wakeup。",
-    "generated_answer": "在Linux内核中，`sleep()` 函数用于使当前进程挂起一段时间，直到被其他进程唤醒。在这个上下文中，锁（通常是一个互斥锁，如 `spinlock`）是关键的，因为它确保了对共享资源的正确同步。当一个进程持有锁并调用 `sleep()` 时，它释放了对资源的独占访问，允许其他进程有机会获取锁并执行操作。\n\n在休眠之前需要锁有两个主要原因：\n\n1. **原子性**：`sleep()` 不应该与其他 CPU 密切交互，以防止数据竞争和丢失同步。通过在调用 `sleep()` 前锁定锁，可以保证在休眠期间不会发生其他进程意外地修改了锁的状态，导致唤醒不一致或死锁。\n\n2. **唤醒机制**：`wakeup()` 函数用于唤醒正在等待的进程。如果锁没有保护，其他进程可能会在进程休眠后立即唤醒它，导致预期之外的行为。通过使用锁，可以确保只有持有锁的进程能够调用 `wakeup()` 来真正地释放进程。\n\n综上所述，`sleep()` 需要在休眠前持有锁是为了保证操作的原子性和一致性，以及正确地管理唤醒流程。",
-    "latency_seconds": 15.86
+    "generated_answer": "Error: Error code: 404 - {'error': {'message': 'The model `xv6-expert` does not exist.', 'type': 'NotFoundError', 'param': None, 'code': 404}}",
+    "latency_seconds": 0.22
   },
   {
     "id": 11,
     "question": "sleeplock (睡眠锁) 和 spinlock (自旋锁) 的核心区别是什么？",
     "expected_source": "sleeplock.c",
     "retrieved_files": [
-      "sleeplock.c",
-      "spinlock.c",
-      "spinlock.h"
+      "fs.c",
+      "sleeplock.h"
     ],
-    "is_hit": true,
+    "is_hit": false,
     "expected_answer": "获取自旋锁失败时 CPU 会死循环等待；而获取睡眠锁失败时，进程会让出 CPU 进入睡眠状态 (SLEEPING)。因此自旋锁期间不能发生上下文切换，而睡眠锁可以。",
-    "generated_answer": "`sleeplock` 和 `spinlock` 都是用于实现互斥访问资源的机制，但它们的工作原理和适用场景有所不同：\n\n1. **Spinlock (自旋锁)**：\n   - 当一个进程试图获取一个已由其他进程持有的锁时，它会进入一个无限循环，即 `while` 循环，检查 `lk->locked` 是否为 0。如果 `locked` 不为 0，说明锁被占用，进程会继续尝试（即\"spin\"，即旋转轮子，等待锁释放）。\n   - 这种机制可能导致 CPU 资源的浪费，因为CPU会一直忙等，而不会执行其他任务，特别是当锁的持有时间很长时。\n   - 通常用于对性能要求较高的情况，如中断处理或者低级别的同步。\n\n2. **Sleeplock (睡眠锁)**：\n   - 睡眠锁在获取失败时会让出处理器执行时间，让出 CPU 让其他进程运行，而不是简单地死循环等待。\n   - 进程会调用 `sleep()` 函数，将自己挂起，进入睡眠状态，直到锁被释放。\n   - 这样可以减少 CPU 的空转时间，提高系统的整体效率，特别是当多个进程竞争同一锁时。\n   - 适用于那些允许上下文切换的场合，比如用户态程序或者系统服务，以避免无谓的 CPU 占用。\n\n总结来说，`spinlock` 是一种基于硬件的、无阻塞的互斥机制，适合对性能要求高的场合，但可能会导致 CPU 资源的浪费；而 `sleeplock` 则是通过操作系统支持的睡眠操作来实现，允许上下文切换，更适合于需要节省 CPU 时间的情况。",
-    "latency_seconds": 18.3
+    "generated_answer": "Error: Error code: 404 - {'error': {'message': 'The model `xv6-expert` does not exist.', 'type': 'NotFoundError', 'param': None, 'code': 404}}",
+    "latency_seconds": 0.45
   },
   {
     "id": 12,
     "question": "xv6 的 buffer cache (bcache) 采用什么块替换策略？是如何用代码实现的？",
     "expected_source": "bio.c",
     "retrieved_files": [
-      "vm.c",
-      "buf.h",
       "bio.c"
     ],
     "is_hit": true,
     "expected_answer": "采用 LRU 策略。通过一个双向链表实现。每次 brelse 释放一个 buffer 时，会将其移动到链表头部 (bcache.head.next)。分配时从链表尾部向前查找空闲块。",
-    "generated_answer": "Xv6 的 buffer cache (bcache) 采用 LRU (Least Recently Used) 策略进行块替换。这个策略通过 `struct buf` 结构体中的 `prev` 和 `next` 指针来实现。`prev` 指针指向当前缓存项的前一个元素，而 `next` 指针指向后一个元素。\n\n当需要替换最近最少使用的缓冲区（即 LRU 最前端的缓存块）时，通常会将 `brelse` 调用来释放不再需要的 `buf` 对象。这样，通过修改 `refcnt`（引用计数）来管理缓存项的生命周期，当 `refcnt` 为 0 时，表示没有其他引用，可以安全地释放内存。在 `bread` 函数中，当从磁盘读取数据后，会更新缓存项的状态，包括设置 `B_VALID` 标志，表示数据已从磁盘加载到内存，从而保持 LRU 列表的一致性。\n\n综上所述，Xv6 的 bcache 通过 LRU 链表和引用计数实现了动态内存管理，以及基于 LRU 的块替换策略。",
-    "latency_seconds": 16.18
+    "generated_answer": "Error: Error code: 404 - {'error': {'message': 'The model `xv6-expert` does not exist.', 'type': 'NotFoundError', 'param': None, 'code': 404}}",
+    "latency_seconds": 0.33
   },
   {
     "id": 13,
@@ -165,22 +163,21 @@
     ],
     "is_hit": true,
     "expected_answer": "inode 是文件系统中的索引节点。它包含文件类型、主次设备号、链接数 (nlink)、文件大小 (size) 以及存储文件数据的直接和间接物理盘块号数组 (addrs)。",
-    "generated_answer": "Inode是文件系统中的一种数据结构，它描述了一个单独的未命名文件。它包含了文件的元数据，如文件类型、大小、链接数（表示有多少个文件被该文件引用）以及存储文件内容的块列表。\n\n在提供的代码片段中，struct dinode 包含以下信息：\n1. type：文件类型，用于区分不同的文件类型，如普通文件（T_FILE）、设备文件（T_DEV）等。\n2. major 和 minor：主设备号和次设备号，通常用于设备文件。\n3. nlink：指向该文件的链接数，即有多少个文件通过其他文件或目录引用了这个文件。\n4. size：文件的实际大小，以字节为单位。\n5. addrs：一个数组，包含两个部分：\n   - 第0到NDIRECT个元素是直接地址数组，指向文件内容的物理块。\n   - NDIRECT后面的元素是间接地址数组，指向NDIRECT个直接地址。\n\n总结一下，inode 是一种用于管理和跟踪文件元数据的结构，而 struct dinode 则包含了构成 inode 的具体信息，包括文件类型、设备信息、链接数、文件大小以及数据块地址。",
-    "latency_seconds": 8.41
+    "generated_answer": "Error: Error code: 404 - {'error': {'message': 'The model `xv6-expert` does not exist.', 'type': 'NotFoundError', 'param': None, 'code': 404}}",
+    "latency_seconds": 0.22
   },
   {
     "id": 14,
     "question": "一个 xv6 文件的最大大小限制是多少个数据块？",
     "expected_source": "fs.h",
     "retrieved_files": [
-      "file.c",
-      "mkfs.c",
-      "asm.h"
+      "param.h",
+      "file.c"
     ],
     "is_hit": false,
     "expected_answer": "因为 inode 包含 NDIRECT (12) 个直接块，和 1 个一级间接块。间接块包含 NINDIRECT (128) 个块号。总计 12 + 128 = 140 块 (MAXFILE)。",
-    "generated_answer": "在提供的代码片段中，没有直接提到Xv6文件的最大大小限制是基于数据块的数量。然而，通过分析逻辑，我们可以推断出一个间接参考。\n\n在`writei()`函数中，当尝试写入文件时，如果文件是inode类型（`f->type == FD_INODE`），它会检查写入的字节数是否超过了某个阈值。这个阈值是基于 inode、indirect 块、分配块和额外的 2 块（用于非对齐写入）的总和，即 `MAXOPBLOCKS-1-1-2`。`MAXOPBLOCKS` 通常由系统定义，但具体数值未在代码中给出。\n\n由于每个 inode 包含多个块，我们不能直接从 inode 的数量得出最大文件大小。但是，如果我们假设 inode 包含至少一个块（因为 inode itself is a data block），并且每个块可以存放 `BSIZE`（假设为 512 字节）的数据，那么：\n\n- 1 inode = 1 数据块\n- 1 indirect block = MAXINDIRECT = 128 块\n- 1 allocation block = NINDIRECT = 1024 块\n\n所以，理论上，一个 inode 及其相关的间接和分配块最多可以表示 `1 + 128 + 1024 = 1143` 块。加上额外的 2 块，总共最多是 `1143 + 2 = 1145` 块。\n\n然而，这并不包括文件系统的元数据（如 inode 列表、日志等），它们也占用空间。`nmeta` 变量表示这些元数据的块数，但没有具体给出。因此，要精确计算最大文件大小，我们需要知道 `nmeta` 的值。\n\n总之，基于提供的信息，一个 xv6 文件的最大大小可能在 1145 块（包括 inode 和间接块）到 `FSSIZE - nmeta` 块之间，但具体数值取决于未明确给出的 `nmeta`。",
-    "latency_seconds": 15.75
+    "generated_answer": "Error: Error code: 404 - {'error': {'message': 'The model `xv6-expert` does not exist.', 'type': 'NotFoundError', 'param': None, 'code': 404}}",
+    "latency_seconds": 0.23
   },
   {
     "id": 15,
@@ -191,21 +188,22 @@
     ],
     "is_hit": true,
     "expected_answer": "pipe 使用一个环形缓冲区存储数据。当缓冲区满时，写进程会调用 sleep 挂起；当缓冲区空时，读进程会 sleep 挂起。读写操作完成后会相互调用 wakeup 唤醒对方。",
-    "generated_answer": "在Xv6内核中，管道（pipe）通过锁机制（`lock`）和条件变量（`wakeup`）来实现读写同步。具体来说：\n\n1. `pipewrite` 函数中：\n   - 当缓冲区满（`p->nwrite == p->nread + PIPESIZE`）且没有新的数据可写时，它检查`p->readopen`是否为0（表示没有读进程打开管道）或者当前进程是否被杀死。如果满足这些条件，它会释放锁并返回-1，以中断写操作。\n   - 否则，它调用`wakeup(&p->nread)`唤醒等待读取数据的进程，然后让当前写进程进入睡眠状态，即调用`sleep(&p->nwrite, &p->lock)`。\n\n2. `piperead` 函数中：\n   - 当缓冲区空（`p->nread == p->nwrite`）且没有新的数据可读时，它也进行类似的检查：检查进程是否被杀死，然后让当前读进程进入睡眠状态。\n   - 一旦读到足够的数据（`i < n`），它会跳出循环，并唤醒等待写入的进程，即调用`wakeup(&p->nwrite)`。\n\n3. `pipeclose` 函数用于关闭管道。如果`writable`为1，它将`p->writeopen`设为0，唤醒等待写入的进程；如果`writable`为0，它将`p->readopen`设为0，唤醒等待读取的进程。当读写都完成后，如果两者都为0，它会释放锁并使用`kfree`释放内存，否则只释放锁。\n\n通过这种方式，Xv6的管道确保了数据的顺序性和完整性，只有当一个进程完成写操作后，另一个进程才能开始读取，从而避免了数据丢失或乱序的问题。",
-    "latency_seconds": 11.33
+    "generated_answer": "Error: Error code: 404 - {'error': {'message': 'The model `xv6-expert` does not exist.', 'type': 'NotFoundError', 'param': None, 'code': 404}}",
+    "latency_seconds": 0.22
   },
   {
     "id": 16,
     "question": "内核在启动时，第一个运行的用户态进程是通过哪个汇编文件加载的？",
     "expected_source": "initcode.S",
     "retrieved_files": [
-      "entryother.S",
-      "proc.c"
+      "proc.c",
+      "main.c",
+      "init.c"
     ],
     "is_hit": false,
     "expected_answer": "是通过 initcode.S 编译生成的二进制机器码。内核在 userinit() 函数中手动将这段机器码拷贝到了第一个进程的内存空间中。",
-    "generated_answer": "内核在启动时，第一个运行的用户态进程是通过`entryother.S`这个汇编文件加载的。这个文件包含了在每个非boot CPU（AP）启动响应STARTUP IPI（中断处理程序）时要执行的代码。当`Startothers`函数在`main.c`中发送STARTUP指令时，它会将`start`这段汇编代码复制到地址0x7000处，并设置好相关的寄存器和堆栈信息。特别是，它将跳转到`mpenter`地址，这是进入内核的入口点。",
-    "latency_seconds": 9.44
+    "generated_answer": "Error: Error code: 404 - {'error': {'message': 'The model `xv6-expert` does not exist.', 'type': 'NotFoundError', 'param': None, 'code': 404}}",
+    "latency_seconds": 0.24
   },
   {
     "id": 17,
@@ -216,21 +214,22 @@
     ],
     "is_hit": true,
     "expected_answer": "如果加载失败，它会跳转到 bad 标签，调用 freevm() 释放已经为新程序分配的所有页表和物理内存，并返回 -1。",
-    "generated_answer": "当`exec()`系统调用尝试加载ELF可执行文件时，如果在加载程序的过程中遇到内存不足的情况，它会通过`allocuvm()`函数来动态分配内存。如果`allocuvm()`返回0，这通常意味着内存分配失败，说明系统无法为新的程序页分配足够的物理内存。\n\n在这种情况下，`exec()`函数会跳转到`bad`标签，进行错误处理。具体来说，它不会保留已经加载的部分，而是停止加载过程，并在日志中记录\"exec: fail\"，最后返回-1表示失败。同时，它还会释放已经获取到的页表项（pgdir），以释放资源。",
-    "latency_seconds": 15.88
+    "generated_answer": "Error: Error code: 404 - {'error': {'message': 'The model `xv6-expert` does not exist.', 'type': 'NotFoundError', 'param': None, 'code': 404}}",
+    "latency_seconds": 0.24
   },
   {
     "id": 18,
     "question": "x86 架构下，xv6 是如何初始化全局描述符表 (GDT) 和任务状态段 (TSS) 的？",
     "expected_source": "vm.c",
     "retrieved_files": [
-      "fs.c",
-      "entry.S"
+      "entry.S",
+      "vm.c",
+      "entryother.S"
     ],
-    "is_hit": false,
+    "is_hit": true,
     "expected_answer": "在 tvinit() 和 seginit() 函数中，为每个 CPU 初始化 GDT，包含内核代码/数据段和用户代码/数据段，并在 TSS 中设置好内核栈的 SS0 和 ESP0，用于陷入内核时切换栈。",
-    "generated_answer": "在提供的代码片段中，Xv6通过设置段寄存器来初始化全局描述符表 (GDT) 和任务状态段 (TSS)。具体步骤如下：\n\n1. 首先，它检查`%cr4`寄存器，如果`CR4_PSE`位（Page Size Extension）被设置，说明系统支持4M字节的页大小扩展。如果支持，将`CR4_PSE`位置1，表示启用PSE。\n\n2. 然后，`movl $(V2P_WO(entrypgdir)), %eax`这行代码将页目录的基地址（entrypgdir）存储在`%eax`寄存器中。`V2P_WO`可能是一个宏或者函数，用于将虚拟地址转换为物理地址，这里假设它将页目录的虚拟地址转换为了对应的物理地址。\n\n3. `movl %eax, %cr3`将计算出的物理页目录地址写入`CR3`寄存器，这通常用于设置CPU的页表基址，使得CPU知道去哪里查找和处理页面映射。\n\n4. 接下来，`movl %cr0, %eax`和`orl $(CR0_PG|CR0_WP), %eax`操作是将`CR0`寄存器设置为`CR0_PG`（开启保护，防止数据被篡改）和`CR0_WP`（写保护，防止直接修改内存内容）。然后将结果写回`%eax`，但因为`CR0`通常是通过硬件直接设置的，所以这部分不是通过代码直接实现的。\n\n5. 最后，`movl $(stack + KSTACKSIZE), %esp`将栈指针（ESP）设置为`stack`地址加上`KSTACKSIZE`，这是内核启动时栈的初始位置，用于保存函数调用栈。\n\n总结来说，Xv6通过修改`CR4`和`CR0`寄存器来配置页表和内存保护，而栈的初始化则是在设置好这些后，通过`%esp`直接操作栈顶指针完成的。具体的GDT和TSS设置可能需要参考Xv6的内核源码，这里没有直接展示这部分内容。",
-    "latency_seconds": 27.72
+    "generated_answer": "Error: Error code: 404 - {'error': {'message': 'The model `xv6-expert` does not exist.', 'type': 'NotFoundError', 'param': None, 'code': 404}}",
+    "latency_seconds": 0.25
   },
   {
     "id": 19,
@@ -241,21 +240,795 @@
     ],
     "is_hit": true,
     "expected_answer": "父进程会调用 sleep 将自己挂起，进入 SLEEPING 状态，直到任意一个子进程调用 exit() 时触发 wakeup() 将其唤醒。",
-    "generated_answer": "在父进程调用 `wait()` 时，如果子进程还没有退出，根据代码逻辑，父进程会进入一个无限循环。在这个循环中，它首先会检查每个进程 (ptable.proc) 是否是当前进程 (curproc) 的孩子。如果是，它会将子进程的状态设为 ZOMBIE（表示已退出），然后唤醒它的父进程 (wakeup1(curproc->parent))。\n\n然而，当父进程发现一个 ZOMBIE 状态的子进程后，它并没有真正地释放子进程，而是调用了 `sched()` 来让出控制权，然后自己跳入了 ZOMBIE 状态。这意味着它会立即进入睡眠，不再执行任何操作，直到有其他进程唤醒它或者其自身的 `wakeup1()` 被另一个事件触发。因此，理论上讲，父进程会在 `wait()` 调用后保持睡眠状态，直到子进程被 `wait()` 收回。",
-    "latency_seconds": 6.6
+    "generated_answer": "Error: Error code: 404 - {'error': {'message': 'The model `xv6-expert` does not exist.', 'type': 'NotFoundError', 'param': None, 'code': 404}}",
+    "latency_seconds": 0.26
   },
   {
     "id": 20,
     "question": "多核处理器下，每个 CPU 独有的数据结构 struct cpu 保存在哪里？",
     "expected_source": "proc.c",
     "retrieved_files": [
-      "mp.c",
-      "mp.h",
+      "proc.c",
+      "proc.h",
+      "mp.c"
+    ],
+    "is_hit": true,
+    "expected_answer": "为了快速访问当前 CPU 的信息，xv6 利用了 x86 的段寄存器机制。在 mpmain() 中，将 CPU 的局部数据存放并用 %gs 寄存器指向它，通过 mycpu() 函数获取。",
+    "generated_answer": "Error: Error code: 404 - {'error': {'message': 'The model `xv6-expert` does not exist.', 'type': 'NotFoundError', 'param': None, 'code': 404}}",
+    "latency_seconds": 0.38
+  },
+  {
+    "id": 21,
+    "question": "在 xv6 中，如果一个进程调用 wait()，但它其实根本没有子进程，会发生什么？",
+    "expected_source": "proc.c",
+    "retrieved_files": [
+      "proc.c"
+    ],
+    "is_hit": true,
+    "expected_answer": "wait() 会遍历进程表，如果没有找到任何 parent 指针指向当前进程的槽位，它会立刻退出遍历并返回 -1，进程不会被挂起睡眠。",
+    "generated_answer": "Error: Error code: 404 - {'error': {'message': 'The model `xv6-expert` does not exist.', 'type': 'NotFoundError', 'param': None, 'code': 404}}",
+    "latency_seconds": 0.42
+  },
+  {
+    "id": 22,
+    "question": "fork() 创建子进程时，父进程的内核栈 (kstack) 里的数据会被复制给子进程吗？",
+    "expected_source": "proc.c",
+    "retrieved_files": [
+      "proc.c"
+    ],
+    "is_hit": true,
+    "expected_answer": "绝不会。fork() 只复制用户态的内存空间（代码、数据、用户栈）。子进程会由 allocproc() 分配一个全新的、干净的内核栈，以便独立处理系统调用和中断。",
+    "generated_answer": "Error: Error code: 404 - {'error': {'message': 'The model `xv6-expert` does not exist.', 'type': 'NotFoundError', 'param': None, 'code': 404}}",
+    "latency_seconds": 0.26
+  },
+  {
+    "id": 23,
+    "question": "宏 PGROUNDDOWN(a) 的数学运算本质是什么？用来干什么？",
+    "expected_source": "mmu.h",
+    "retrieved_files": [
+      "mmu.h",
+      "vm.c"
+    ],
+    "is_hit": true,
+    "expected_answer": "本质是 `(((a)) & ~(PGSIZE-1))`。它通过位与运算，强行将虚拟地址的低 12 位清零。常用于根据任意地址快速计算出该地址所在的 4KB 物理页的首地址。",
+    "generated_answer": "Error: Error code: 404 - {'error': {'message': 'The model `xv6-expert` does not exist.', 'type': 'NotFoundError', 'param': None, 'code': 404}}",
+    "latency_seconds": 0.22
+  },
+  {
+    "id": 24,
+    "question": "如果 mappages() 被要求映射一段 size 为 0 的内存，会发生什么？",
+    "expected_source": "vm.c",
+    "retrieved_files": [
+      "vm.c"
+    ],
+    "is_hit": true,
+    "expected_answer": "mappages 中的循环条件会导致没有任何 PTE 被修改。但是在执行循环前，它会使用 panic 进行断言检查，不过在原生 xv6 中 size 为 0 直接循环跳出，安全返回 0。",
+    "generated_answer": "Error: Error code: 404 - {'error': {'message': 'The model `xv6-expert` does not exist.', 'type': 'NotFoundError', 'param': None, 'code': 404}}",
+    "latency_seconds": 0.23
+  },
+  {
+    "id": 25,
+    "question": "发生除零错误 (Divide Error) 时，x86 硬件触发的中断向量号是多少？",
+    "expected_source": "traps.h",
+    "retrieved_files": [
+      "picirq.c",
+      "traps.h",
+      "usertests.c"
+    ],
+    "is_hit": true,
+    "expected_answer": "硬件触发的中断向量号是 0 (T_DIVIDE)。内核的 trap() 收到这个向量号后，如果发现是用户进程除零，会打印错误信息并将进程 killed 置 1。",
+    "generated_answer": "Error: Error code: 404 - {'error': {'message': 'The model `xv6-expert` does not exist.', 'type': 'NotFoundError', 'param': None, 'code': 404}}",
+    "latency_seconds": 0.24
+  },
+  {
+    "id": 26,
+    "question": "当自旋锁 acquire() 失败并进入 while(xchg) 的死循环时，会对系统有什么影响？",
+    "expected_source": "spinlock.c",
+    "retrieved_files": [
+      "console.c",
+      "spinlock.c"
+    ],
+    "is_hit": true,
+    "expected_answer": "它会 100% 占用当前 CPU 的计算资源进行忙等待 (Busy Wait)，导致该 CPU 无法执行其他任务，直到锁的持有者在其他 CPU 上将其释放。因此自旋锁保护的临界区必须极短。",
+    "generated_answer": "Error: Error code: 404 - {'error': {'message': 'The model `xv6-expert` does not exist.', 'type': 'NotFoundError', 'param': None, 'code': 404}}",
+    "latency_seconds": 0.23
+  },
+  {
+    "id": 27,
+    "question": "为什么 pipe.c 中的 pipeclose() 如果发现管道既没有读端也没有写端了，要去释放底层的 pi 物理页？",
+    "expected_source": "pipe.c",
+    "retrieved_files": [
+      "pipe.c",
+      "file.c"
+    ],
+    "is_hit": true,
+    "expected_answer": "管道的环形缓冲区 pi 是通过 kalloc() 在堆内存上动态分配的。如果读写进程都关闭了 fd，这个管道生命周期就结束了。如果不调用 kfree(pi) 释放内存，会导致内核级别的内存泄漏。",
+    "generated_answer": "Error: Error code: 404 - {'error': {'message': 'The model `xv6-expert` does not exist.', 'type': 'NotFoundError', 'param': None, 'code': 404}}",
+    "latency_seconds": 0.25
+  },
+  {
+    "id": 28,
+    "question": "在 log.c 中，如果一次需要写入磁盘的数据大于 MAXOPBLOCKS 怎么办？",
+    "expected_source": "log.c",
+    "retrieved_files": [
+      "log.c",
+      "file.c"
+    ],
+    "is_hit": true,
+    "expected_answer": "文件系统的上层调用者（如 filewrite）必须自己负责将大数据切割。它需要在一个循环中多次调用 begin_op() 和 end_op()，确保单个事务的大小绝对不会超过 MAXOPBLOCKS 限制。",
+    "generated_answer": "Error: Error code: 404 - {'error': {'message': 'The model `xv6-expert` does not exist.', 'type': 'NotFoundError', 'param': None, 'code': 404}}",
+    "latency_seconds": 0.23
+  },
+  {
+    "id": 29,
+    "question": "bcache 采用双向链表，如果所有的 block 都在被使用 (refcnt > 0)，bget() 寻找空闲块会怎样？",
+    "expected_source": "bio.c",
+    "retrieved_files": [
+      "bio.c"
+    ],
+    "is_hit": true,
+    "expected_answer": "bget() 会在遍历完整个链表后发现找不到任何引用计数为 0 的块。此时它直接调用 panic(\"bget: no buffers\")，导致内核立刻崩溃。所以系统并发的 I/O 压力不能超过缓存块的总数 (NBUF)。",
+    "generated_answer": "Error: Error code: 404 - {'error': {'message': 'The model `xv6-expert` does not exist.', 'type': 'NotFoundError', 'param': None, 'code': 404}}",
+    "latency_seconds": 0.23
+  },
+  {
+    "id": 30,
+    "question": "consoleintr() 中，按下 Ctrl+U 的效果是什么？底层的逻辑是怎么实现的？",
+    "expected_source": "console.c",
+    "retrieved_files": [
+      "console.c"
+    ],
+    "is_hit": true,
+    "expected_answer": "Ctrl+U 会删除终端当前输入行中光标之前的所有字符。底层在一个循环中不断减少 input.e 的索引，并调用 consputc('\\b') 在屏幕上退格擦除，直到输入缓冲区被清空或者遇到换行符。",
+    "generated_answer": "Error: Error code: 404 - {'error': {'message': 'The model `xv6-expert` does not exist.', 'type': 'NotFoundError', 'param': None, 'code': 404}}",
+    "latency_seconds": 0.44
+  },
+  {
+    "id": 31,
+    "question": "uart.c 的 uartintr() 在读取字符时，为什么使用一个 while 循环而不是只读一次？",
+    "expected_source": "uart.c",
+    "retrieved_files": [
+      "uart.c"
+    ],
+    "is_hit": true,
+    "expected_answer": "因为在响应 UART 中断期间，串口硬件的 FIFO 缓冲区可能同时接收到了多个字符。通过循环读取 LSR 寄存器的 Data Ready 位，可以一次性将所有到达的字符清空，提高 I/O 效率并防止丢失。",
+    "generated_answer": "Error: Error code: 404 - {'error': {'message': 'The model `xv6-expert` does not exist.', 'type': 'NotFoundError', 'param': None, 'code': 404}}",
+    "latency_seconds": 0.34
+  },
+  {
+    "id": 32,
+    "question": "如果主引导记录 (bootasm.S + bootmain.c) 编译出来大于 512 字节会发生什么？",
+    "expected_source": "bootblock",
+    "retrieved_files": [
+      "bootasm.S",
+      "bootmain.c"
+    ],
+    "is_hit": false,
+    "expected_answer": "主板 BIOS 在引导时，只会将硬盘的第 0 号扇区（前 512 字节）加载到内存 0x7C00。如果大于 512 字节，超出部分将被直接截断。此外，最后两个字节必须是 0x55 和 0xAA 签名，否则 BIOS 会拒绝引导。",
+    "generated_answer": "Error: Error code: 404 - {'error': {'message': 'The model `xv6-expert` does not exist.', 'type': 'NotFoundError', 'param': None, 'code': 404}}",
+    "latency_seconds": 0.25
+  },
+  {
+    "id": 33,
+    "question": "ioapic.c 中是如何将中断路由给特定的 CPU 的？",
+    "expected_source": "ioapic.c",
+    "retrieved_files": [
+      "ioapic.c"
+    ],
+    "is_hit": true,
+    "expected_answer": "ioapicenable() 会配置重定向表。它将目标 CPU 的 apicid 写入重定向表项的高 32 位寄存器中，使得发生物理中断时，IOAPIC 只会向指定的这个 CPU 的 LAPIC 发送中断消息。",
+    "generated_answer": "Error: Error code: 404 - {'error': {'message': 'The model `xv6-expert` does not exist.', 'type': 'NotFoundError', 'param': None, 'code': 404}}",
+    "latency_seconds": 0.21
+  },
+  {
+    "id": 34,
+    "question": "strncmp() 和 strcmp() 在 xv6 中的实现有什么安全区别？",
+    "expected_source": "string.c",
+    "retrieved_files": [
+      "string.c",
+      "fs.c",
+      "defs.h"
+    ],
+    "is_hit": true,
+    "expected_answer": "strcmp 依赖于字符串必须以 '\\0' 结尾，如果遇到损坏的字符串会导致越界访问。而 strncmp 接收一个最大长度参数 n，即使没有 '\\0'，最多比较 n 个字节后就会强制停止，防止内存越界。",
+    "generated_answer": "Error: Error code: 404 - {'error': {'message': 'The model `xv6-expert` does not exist.', 'type': 'NotFoundError', 'param': None, 'code': 404}}",
+    "latency_seconds": 0.24
+  },
+  {
+    "id": 35,
+    "question": "mpmain() 在启动调度器之前，调用的最后一行代码是什么？为什么调用它？",
+    "expected_source": "main.c",
+    "retrieved_files": [
+      "main.c"
+    ],
+    "is_hit": true,
+    "expected_answer": "调用了 atomic_xchg(&cpu->started, 1)。这是一个同步标志。主 CPU 在启动辅助 CPU (AP) 时，会在循环里等待这个标志变为 1。当 AP 将其置 1 时，意味着该 CPU 已完全初始化完毕，准备进入调度死循环了。",
+    "generated_answer": "Error: Error code: 404 - {'error': {'message': 'The model `xv6-expert` does not exist.', 'type': 'NotFoundError', 'param': None, 'code': 404}}",
+    "latency_seconds": 0.23
+  },
+  {
+    "id": 36,
+    "question": "exec() 如果在中途（比如分配了页表，但读取 ELF 数据时）失败了，原进程会被破坏吗？",
+    "expected_source": "exec.c",
+    "retrieved_files": [
+      "sh.c",
+      "exec.c"
+    ],
+    "is_hit": true,
+    "expected_answer": "不会。exec() 会小心翼翼地构造一个全新的独立页目录 (pgdir)。在整个 ELF 完全成功加载进这个新页表之前，原进程的旧页表和内存完全原封不动。如果失败，它只销毁这个临时新页表并返回 -1。",
+    "generated_answer": "Error: Error code: 404 - {'error': {'message': 'The model `xv6-expert` does not exist.', 'type': 'NotFoundError', 'param': None, 'code': 404}}",
+    "latency_seconds": 0.24
+  },
+  {
+    "id": 37,
+    "question": "sys_sbrk() 传入非页对齐的 size (比如 1 字节)，物理内存也是按 1 字节分配的吗？",
+    "expected_source": "sysproc.c",
+    "retrieved_files": [
+      "usertests.c"
+    ],
+    "is_hit": false,
+    "expected_answer": "不是。虽然进程的边界 sz 可能只增加了 1 字节，但底层 allocuvm() 调用 kalloc() 都是以 4KB 物理页为最小单位分配的。内部碎片是被允许且不可避免的。",
+    "generated_answer": "Error: Error code: 404 - {'error': {'message': 'The model `xv6-expert` does not exist.', 'type': 'NotFoundError', 'param': None, 'code': 404}}",
+    "latency_seconds": 0.26
+  },
+  {
+    "id": 38,
+    "question": "x86 的 cli 指令会屏蔽 NMI (不可屏蔽中断) 吗？",
+    "expected_source": "x86.h",
+    "retrieved_files": [
+      "picirq.c",
+      "spinlock.c",
+      "x86.h"
+    ],
+    "is_hit": true,
+    "expected_answer": "不会。cli (Clear Interrupt Flag) 只能将 EFLAGS 寄存器中的 IF 位置 0，从而屏蔽外部的常规硬件中断 (如时钟、键盘)。NMI (如硬件严重故障信号) 是无法被 IF 位屏蔽的，必然会触发中断。",
+    "generated_answer": "Error: Error code: 404 - {'error': {'message': 'The model `xv6-expert` does not exist.', 'type': 'NotFoundError', 'param': None, 'code': 404}}",
+    "latency_seconds": 0.25
+  },
+  {
+    "id": 39,
+    "question": "系统常量 EXTMEM 代表什么？它的物理地址是多少？",
+    "expected_source": "memlayout.h",
+    "retrieved_files": [
+      "vm.c",
+      "memlayout.h"
+    ],
+    "is_hit": true,
+    "expected_answer": "EXTMEM 代表“扩展内存”的起点，即早年 PC 架构中突破 1MB 之后的第一段内存空间。在 xv6 中它被宏定义为物理地址 0x100000。xv6 的内核代码正是被 bootloader 加载到了这里。",
+    "generated_answer": "Error: Error code: 404 - {'error': {'message': 'The model `xv6-expert` does not exist.', 'type': 'NotFoundError', 'param': None, 'code': 404}}",
+    "latency_seconds": 0.3
+  },
+  {
+    "id": 40,
+    "question": "默认情况下，xv6 能够管理的物理内存上限 (PHYSTOP) 是多少？",
+    "expected_source": "memlayout.h",
+    "retrieved_files": [
+      "kalloc.c",
+      "memlayout.h",
+      "vm.c"
+    ],
+    "is_hit": true,
+    "expected_answer": "PHYSTOP 被宏定义为 0xE000000，即 224 MB。这意味着哪怕你的虚拟机给了 4GB 内存，xv6 默认也只会把前 224 MB 加入到 kmem.freelist 中进行管理，超出部分被直接忽略。",
+    "generated_answer": "Error: Error code: 404 - {'error': {'message': 'The model `xv6-expert` does not exist.', 'type': 'NotFoundError', 'param': None, 'code': 404}}",
+    "latency_seconds": 0.45
+  },
+  {
+    "id": 41,
+    "question": "exec() 能够接收的命令行参数最大个数 (MAXARG) 是多少？如果超过会怎样？",
+    "expected_source": "param.h",
+    "retrieved_files": [
+      "param.h",
+      "exec.c"
+    ],
+    "is_hit": true,
+    "expected_answer": "MAXARG 被定义为 32。如果在 shell 中运行一个带有 33 个参数的命令，exec() 在提取参数的循环中会触及 MAXARG 限制，直接终止处理并返回错误 -1。",
+    "generated_answer": "Error: Error code: 404 - {'error': {'message': 'The model `xv6-expert` does not exist.', 'type': 'NotFoundError', 'param': None, 'code': 404}}",
+    "latency_seconds": 0.23
+  },
+  {
+    "id": 42,
+    "question": "sys_mkdir() 想要创建的目录已经存在了会怎样？",
+    "expected_source": "sysfile.c",
+    "retrieved_files": [
+      "sysfile.c",
+      "usertests.c"
+    ],
+    "is_hit": true,
+    "expected_answer": "sys_mkdir 底层调用的 create() 会解析路径并使用 dirlookup 去父目录寻找。如果发现同名条目已经存在，create() 会直接返回 0 (空指针)，sys_mkdir 检测到空指针后会返回 -1 代表创建失败。",
+    "generated_answer": "Error: Error code: 404 - {'error': {'message': 'The model `xv6-expert` does not exist.', 'type': 'NotFoundError', 'param': None, 'code': 404}}",
+    "latency_seconds": 0.24
+  },
+  {
+    "id": 43,
+    "question": "在 sh.c 中，当命令以 '&' 结尾 (后台运行) 时，shell 的执行逻辑有什么变化？",
+    "expected_source": "sh.c",
+    "retrieved_files": [
+      "sh.c"
+    ],
+    "is_hit": true,
+    "expected_answer": "在正常命令中，shell fork 出子进程后会调用 wait() 阻塞自己直到命令执行完毕。如果解析到 '&'，它构建一个 BACK 类型的执行树。在执行时，shell 也会 fork 子进程去执行命令，但父 shell 会直接退出执行函数返回主循环，继续打印提示符，不调用 wait() 等待它。",
+    "generated_answer": "Error: Error code: 404 - {'error': {'message': 'The model `xv6-expert` does not exist.', 'type': 'NotFoundError', 'param': None, 'code': 404}}",
+    "latency_seconds": 0.25
+  },
+  {
+    "id": 44,
+    "question": "umalloc.c 中，如果用户态申请了极其巨大的内存 (如 200MB)，malloc 会怎样？",
+    "expected_source": "umalloc.c",
+    "retrieved_files": [
+      "usertests.c",
+      "umalloc.c"
+    ],
+    "is_hit": true,
+    "expected_answer": "malloc 发现空闲链表不够，会调用 morecore。morecore 向 sbrk 发起巨大的请求。由于物理内存上限只有 224MB，且已被内核和其他程序使用，sbrk 会因内存不足返回 -1。最终 malloc 将返回 0 (NULL) 表示分配彻底失败。",
+    "generated_answer": "Error: Error code: 404 - {'error': {'message': 'The model `xv6-expert` does not exist.', 'type': 'NotFoundError', 'param': None, 'code': 404}}",
+    "latency_seconds": 0.25
+  },
+  {
+    "id": 45,
+    "question": "如果用户程序覆盖了 0 号文件描述符，对 printf 会有影响吗？",
+    "expected_source": "printf.c",
+    "retrieved_files": [
+      "usertests.c"
+    ],
+    "is_hit": false,
+    "expected_answer": "通常没有直接影响。0 号是 stdin (标准输入)。用户态的 printf 函数硬编码了写入 1 号文件描述符 (stdout)。只有当 1 号文件描述符被 close 或重定向，printf 的输出才会被改变目的地或丢失。",
+    "generated_answer": "Error: Error code: 404 - {'error': {'message': 'The model `xv6-expert` does not exist.', 'type': 'NotFoundError', 'param': None, 'code': 404}}",
+    "latency_seconds": 0.22
+  },
+  {
+    "id": 46,
+    "question": "CR4_PSE 位的作用是什么？内核在什么时候设置它？",
+    "expected_source": "mmu.h",
+    "retrieved_files": [
+      "entry.S",
+      "mmu.h",
+      "entryother.S"
+    ],
+    "is_hit": true,
+    "expected_answer": "PSE (Page Size Extension) 允许使用 4MB 大小的超级页，而不是标准的 4KB 页。在系统刚启动的 entry.S 阶段，为了用极简的一级页表临时映射整个内核，内核将 CR4_PSE 位置 1 开启大页支持。",
+    "generated_answer": "Error: Error code: 404 - {'error': {'message': 'The model `xv6-expert` does not exist.', 'type': 'NotFoundError', 'param': None, 'code': 404}}",
+    "latency_seconds": 0.22
+  },
+  {
+    "id": 47,
+    "question": "如果一个进程调用 exit()，但它的父进程恰好由于某种原因死锁了永远不调用 wait()，该进程会怎样？",
+    "expected_source": "proc.c",
+    "retrieved_files": [
+      "proc.c",
+      "usertests.c"
+    ],
+    "is_hit": true,
+    "expected_answer": "该进程会永远停留在 ZOMBIE (僵尸) 状态。它的内核栈、内存和打开的文件已被释放，但它的 proc 结构体依然在进程表里占着坑位。如果这种情况多次发生，系统进程表最终会被僵尸进程占满，无法 fork 新进程。",
+    "generated_answer": "Error: Error code: 404 - {'error': {'message': 'The model `xv6-expert` does not exist.', 'type': 'NotFoundError', 'param': None, 'code': 404}}",
+    "latency_seconds": 0.23
+  },
+  {
+    "id": 48,
+    "question": "sys_sleep() 在睡眠期间，进程会被其他信号强制唤醒吗 (例如 kill 信号)？",
+    "expected_source": "sysproc.c",
+    "retrieved_files": [
+      "syscall.c",
+      "sysproc.c"
+    ],
+    "is_hit": true,
+    "expected_answer": "会被强制打断。当系统调用进入 sleep 后，如果另一个进程对其发起了 kill()，它的 killed 标志位被置 1 并且状态变为 RUNNABLE。被调度回 CPU 时，sys_sleep 的内部循环会检测到 p->killed，此时它会放弃睡眠，直接返回 -1 退出系统调用。",
+    "generated_answer": "Error: Error code: 404 - {'error': {'message': 'The model `xv6-expert` does not exist.', 'type': 'NotFoundError', 'param': None, 'code': 404}}",
+    "latency_seconds": 0.28
+  },
+  {
+    "id": 49,
+    "question": "为什么 xv6 的 inode 没有存储文件名？",
+    "expected_source": "fs.h",
+    "retrieved_files": [
+      "fs.c"
+    ],
+    "is_hit": false,
+    "expected_answer": "遵循 Unix 设计哲学。文件名是人类维度的概念，而 inode 是磁盘维度的概念。文件名被存储在“目录文件”的数据块中，目录将其视为一张映射表 (名称 -> inode 号)。这使得多个文件名 (硬链接) 指向同一个 inode 成为可能。",
+    "generated_answer": "Error: Error code: 404 - {'error': {'message': 'The model `xv6-expert` does not exist.', 'type': 'NotFoundError', 'param': None, 'code': 404}}",
+    "latency_seconds": 0.4
+  },
+  {
+    "id": 50,
+    "question": "readi() 如果试图读取一个 T_DEV (设备) 类型的文件，它会读取磁盘数据块吗？",
+    "expected_source": "fs.c",
+    "retrieved_files": [
+      "fs.c"
+    ],
+    "is_hit": true,
+    "expected_answer": "不会读取磁盘。readi() 会检查 inode 的 type。如果它是 T_DEV，它会利用 inode 中的 major 主设备号，去索引内核的全局 devsw 数组，直接跳转并调用该硬件驱动专门注册的 read 函数 (如 console_read)。",
+    "generated_answer": "Error: Error code: 404 - {'error': {'message': 'The model `xv6-expert` does not exist.', 'type': 'NotFoundError', 'param': None, 'code': 404}}",
+    "latency_seconds": 0.3
+  },
+  {
+    "id": 51,
+    "question": "sys_mknod 传入的主设备号 major 为 1，次设备号 minor 为 1 代表什么？",
+    "expected_source": "file.h",
+    "retrieved_files": [
+      "sysfile.c",
+      "fs.h"
+    ],
+    "is_hit": false,
+    "expected_answer": "在 xv6 中，主设备号 1 对应的是控制台驱动 (Console)。次设备号通常用于区分同一个驱动下的不同子设备，控制台目前默认使用 minor 1 作为其标志。这就是 /console 文件的真身。",
+    "generated_answer": "Error: Error code: 404 - {'error': {'message': 'The model `xv6-expert` does not exist.', 'type': 'NotFoundError', 'param': None, 'code': 404}}",
+    "latency_seconds": 0.23
+  },
+  {
+    "id": 52,
+    "question": "在 xv6 架构下，用户空间和内核空间共享相同的页表结构吗？",
+    "expected_source": "vm.c",
+    "retrieved_files": [
+      "entry.S",
+      "vm.c"
+    ],
+    "is_hit": true,
+    "expected_answer": "是的。xv6 每个进程只有一个页表 (pgdir)。页表的高 2GB (KERNBASE 之上) 被映射为了内核的数据和物理内存，低部分被映射为用户程序。当陷入内核时，无需切换页表 (CR3 不变)，仅靠页表项的 PTE_U 权限位拦截用户态非法访问内核空间。",
+    "generated_answer": "Error: Error code: 404 - {'error': {'message': 'The model `xv6-expert` does not exist.', 'type': 'NotFoundError', 'param': None, 'code': 404}}",
+    "latency_seconds": 0.23
+  },
+  {
+    "id": 53,
+    "question": "itrunc() 清理大文件时，是如何处理一级间接块 (Indirect Block) 的？",
+    "expected_source": "fs.c",
+    "retrieved_files": [
+      "usertests.c",
+      "file.c",
+      "fs.c"
+    ],
+    "is_hit": true,
+    "expected_answer": "itrunc 首先读取 inode 的 addr[NDIRECT] 盘块，这是一个包含 128 个盘块号的数组。它遍历这个数组，对每一个有效的盘块号调用 bfree 释放底层数据块；循环结束后，再调用 bfree 释放这个存放 128 个盘块号的间接块本身。",
+    "generated_answer": "Error: Error code: 404 - {'error': {'message': 'The model `xv6-expert` does not exist.', 'type': 'NotFoundError', 'param': None, 'code': 404}}",
+    "latency_seconds": 0.26
+  },
+  {
+    "id": 54,
+    "question": "如果在 trap() 中发生了嵌套中断 (比如时钟打断了硬盘处理)，xv6 支持吗？",
+    "expected_source": "trap.c",
+    "retrieved_files": [
+      "picirq.c",
+      "trap.c",
+      "lapic.c"
+    ],
+    "is_hit": true,
+    "expected_answer": "原生 xv6 非常保守。当陷入 trap 时，硬件已经自动关中断了。除了一些特殊情况（如 scheduler 循环中主动 sti），普通的系统调用和设备中断处理程序中，xv6 默认全程处于关中断状态，不支持中断抢占和嵌套，从而极大简化了内核锁的设计。",
+    "generated_answer": "Error: Error code: 404 - {'error': {'message': 'The model `xv6-expert` does not exist.', 'type': 'NotFoundError', 'param': None, 'code': 404}}",
+    "latency_seconds": 0.26
+  },
+  {
+    "id": 55,
+    "question": "sys_wait() 返回的 pid 是在哪个阶段确定的？",
+    "expected_source": "sysproc.c",
+    "retrieved_files": [
+      "proc.c",
+      "usertests.c",
+      "sysproc.c"
+    ],
+    "is_hit": true,
+    "expected_answer": "sys_wait() 遍历进程表寻找 ZOMBIE 子进程。一旦找到，它会立刻提取该子进程的 p->pid 保存到一个临时变量中。随后执行一系列释放资源的操作并将其设为 UNUSED 状态，最后返回那个临时保存的 pid 给父进程。",
+    "generated_answer": "Error: Error code: 404 - {'error': {'message': 'The model `xv6-expert` does not exist.', 'type': 'NotFoundError', 'param': None, 'code': 404}}",
+    "latency_seconds": 0.24
+  },
+  {
+    "id": 56,
+    "question": "当文件系统进行 commit() 时，如果 write_log 成功但 write_head 还没写入时断电了，重启会发生什么？",
+    "expected_source": "log.c",
+    "retrieved_files": [
+      "log.c"
+    ],
+    "is_hit": true,
+    "expected_answer": "事务不会被恢复。因为 recover_from_log() 只相信日志头部 (head) 的数据。如果 write_head 没有成功，头部的 n 字段依然是 0。系统重启时会认为什么都没发生，那些已经写入日志区的数据被视作无效垃圾，原数据依然保持一致。",
+    "generated_answer": "Error: Error code: 404 - {'error': {'message': 'The model `xv6-expert` does not exist.', 'type': 'NotFoundError', 'param': None, 'code': 404}}",
+    "latency_seconds": 0.23
+  },
+  {
+    "id": 57,
+    "question": "kfree() 如果传入一个不符合页对齐的地址，或者不在系统内存范围内的地址，会怎么处理？",
+    "expected_source": "kalloc.c",
+    "retrieved_files": [
+      "pipe.c",
+      "vm.c",
+      "kalloc.c"
+    ],
+    "is_hit": true,
+    "expected_answer": "kfree() 会极其严厉地执行边界检查。如果传入地址 v 不是按 4KB 对齐 (v % PGSIZE != 0)，或者 v 小于 end (内核代码区)，或者 v 大于物理内存顶端 PHYSTOP，kfree 会直接触发 panic 断言，系统崩溃以防止释放错误的内存。",
+    "generated_answer": "Error: Error code: 404 - {'error': {'message': 'The model `xv6-expert` does not exist.', 'type': 'NotFoundError', 'param': None, 'code': 404}}",
+    "latency_seconds": 0.25
+  },
+  {
+    "id": 58,
+    "question": "用户态程序如何获取自己打开的文件在文件系统中的 inode 号？",
+    "expected_source": "sysfile.c",
+    "retrieved_files": [
+      "fs.c"
+    ],
+    "is_hit": false,
+    "expected_answer": "用户态无法直接访问内核的 inode 结构。它必须调用 fstat(fd, &stat) 系统调用。内核会将该 fd 对应的底层 inode 中的 ino (节点号) 填充到用户态的 stat 结构体中返回给程序。",
+    "generated_answer": "Error: Error code: 404 - {'error': {'message': 'The model `xv6-expert` does not exist.', 'type': 'NotFoundError', 'param': None, 'code': 404}}",
+    "latency_seconds": 0.23
+  },
+  {
+    "id": 59,
+    "question": "xv6 进程在调用 exec() 加载了新程序后，原来的 PID 会变吗？",
+    "expected_source": "exec.c",
+    "retrieved_files": [
+      "syscall.c",
+      "sysproc.c",
+      "sh.c"
+    ],
+    "is_hit": false,
+    "expected_answer": "绝对不会。exec() 的本质是“换脑不换皮”。它只替换进程的内存空间 (代码、数据、堆、栈)、重置指令指针 eip 和部分寄存器，但该进程的 proc 结构体、PID、父子关系以及已打开的文件描述符全部保留原样。",
+    "generated_answer": "Error: Error code: 404 - {'error': {'message': 'The model `xv6-expert` does not exist.', 'type': 'NotFoundError', 'param': None, 'code': 404}}",
+    "latency_seconds": 0.28
+  },
+  {
+    "id": 60,
+    "question": "sh.c 中如果用户输入的命令里存在 '<'，shell 会怎么处理标准输入？",
+    "expected_source": "sh.c",
+    "retrieved_files": [
+      "sh.c"
+    ],
+    "is_hit": true,
+    "expected_answer": "和输出重定向类似，shell 子进程会调用 close(0) 关闭默认的标准输入（终端键盘）。然后调用 open(file, O_RDONLY)。此时这个文件刚好分配到了最小的可用 fd 0。随后执行 exec，新程序读取标准输入时，实际上读的就是这个文件的数据。",
+    "generated_answer": "Error: Error code: 404 - {'error': {'message': 'The model `xv6-expert` does not exist.', 'type': 'NotFoundError', 'param': None, 'code': 404}}",
+    "latency_seconds": 0.37
+  },
+  {
+    "id": 61,
+    "question": "xv6 中的 yield() 和 sleep() 导致进程状态变化有什么根本区别？",
+    "expected_source": "proc.c",
+    "retrieved_files": [
+      "proc.c",
+      "defs.h"
+    ],
+    "is_hit": true,
+    "expected_answer": "yield() 只是为了让出 CPU 的时间片，进程立刻变为 RUNNABLE 状态，随时可能在下一秒就被重新调度运行。而 sleep() 是因为进程需要等待某个事件（如 I/O 或锁），它变为 SLEEPING 状态，如果不被显式唤醒 (wakeup) 将永远不会被调度。",
+    "generated_answer": "Error: Error code: 404 - {'error': {'message': 'The model `xv6-expert` does not exist.', 'type': 'NotFoundError', 'param': None, 'code': 404}}",
+    "latency_seconds": 0.32
+  },
+  {
+    "id": 62,
+    "question": "sys_link(oldpath, newpath) 创建硬链接时，会对目标目录和旧文件加锁吗？顺序是什么？",
+    "expected_source": "sysfile.c",
+    "retrieved_files": [
+      "sysfile.c"
+    ],
+    "is_hit": true,
+    "expected_answer": "会。它首先通过 namei 找到 oldpath 的 inode，使用 ilock 锁定它以增加 nlink，然后 iunlock 解锁。接着使用 nameiparent 找到 newpath 所在的父目录，锁定父目录，调用 dirlink 插入新目录项，最后解锁父目录。",
+    "generated_answer": "Error: Error code: 404 - {'error': {'message': 'The model `xv6-expert` does not exist.', 'type': 'NotFoundError', 'param': None, 'code': 404}}",
+    "latency_seconds": 0.27
+  },
+  {
+    "id": 63,
+    "question": "在 x86 系统中，内核是怎么知道物理内存大小的？xv6 又是怎么处理的？",
+    "expected_source": "memlayout.h",
+    "retrieved_files": [
+      "mkfs.c",
+      "vm.c"
+    ],
+    "is_hit": false,
+    "expected_answer": "真正的操作系统会通过 BIOS (如 INT 15h) 获取内存映射图 (e820 map) 来感知物理内存。但 xv6 为了精简，完全跳过了这一步。它直接在宏 PHYSTOP 中硬编码假定机器至少有 224MB 内存，这是一种非常典型的教学妥协方案。",
+    "generated_answer": "Error: Error code: 404 - {'error': {'message': 'The model `xv6-expert` does not exist.', 'type': 'NotFoundError', 'param': None, 'code': 404}}",
+    "latency_seconds": 0.26
+  },
+  {
+    "id": 64,
+    "question": "sys_fstat() 的参数 fd 是怎么被内核验证为合法文件描述符的？",
+    "expected_source": "sysfile.c",
+    "retrieved_files": [
+      "sysfile.c"
+    ],
+    "is_hit": true,
+    "expected_answer": "通过 argfd() 存根函数。argfd 首先调用 argint 提取出整数 fd，然后严格检查 fd 是否在 0 到 NOFILE 之间，且当前进程的 ofile[fd] 指针不为 NULL。如果不合法，立刻返回 -1 拒绝继续执行 sys_fstat。",
+    "generated_answer": "Error: Error code: 404 - {'error': {'message': 'The model `xv6-expert` does not exist.', 'type': 'NotFoundError', 'param': None, 'code': 404}}",
+    "latency_seconds": 0.26
+  },
+  {
+    "id": 65,
+    "question": "系统常量 ROOTDEV 在 xv6 中代表什么？",
+    "expected_source": "param.h",
+    "retrieved_files": [
+      "entry.S",
+      "param.h"
+    ],
+    "is_hit": true,
+    "expected_answer": "ROOTDEV 定义为 1。它是 xv6 内核启动时用于挂载根文件系统 (/) 的默认磁盘设备的设备号。这意味着 xv6 假定第一块 IDE 磁盘 (主盘) 上存放着操作系统的文件数据。",
+    "generated_answer": "Error: Error code: 404 - {'error': {'message': 'The model `xv6-expert` does not exist.', 'type': 'NotFoundError', 'param': None, 'code': 404}}",
+    "latency_seconds": 0.25
+  },
+  {
+    "id": 66,
+    "question": "inode 结构体中的 major 和 minor 只有在什么情况下才有用？",
+    "expected_source": "fs.h",
+    "retrieved_files": [
+      "sysfile.c",
+      "fs.h"
+    ],
+    "is_hit": true,
+    "expected_answer": "只有当 inode 的 type 为 T_DEV (设备文件) 时，major 和 minor 才有意义。如果它是 T_FILE (普通文件) 或 T_DIR (目录)，这两个字段毫无用处，而存放数据块号的 addrs 数组才是有意义的。",
+    "generated_answer": "Error: Error code: 404 - {'error': {'message': 'The model `xv6-expert` does not exist.', 'type': 'NotFoundError', 'param': None, 'code': 404}}",
+    "latency_seconds": 0.25
+  },
+  {
+    "id": 67,
+    "question": "xv6 的 init.c 用户进程会死吗？如果它死掉了会怎样？",
+    "expected_source": "proc.c",
+    "retrieved_files": [
+      "main.c",
+      "uart.c",
+      "init.c"
+    ],
+    "is_hit": false,
+    "expected_answer": "按照设计，init 程序中的循环是无限的。如果在极端异常下它退出了，或者被用户强行 kill 掉了，xv6 内核在 exit() 的清理逻辑里有一个特殊断言：如果发现当前死亡进程等于 initproc，内核将直接 panic(\"init exiting\") 引发死机。",
+    "generated_answer": "Error: Error code: 404 - {'error': {'message': 'The model `xv6-expert` does not exist.', 'type': 'NotFoundError', 'param': None, 'code': 404}}",
+    "latency_seconds": 0.24
+  },
+  {
+    "id": 68,
+    "question": "如果 xv6 内核运行中分配光了所有的空闲物理内存页 (freelist == NULL)，且此时系统发生了严重的页异常，内核会采取内存页置换 (Swapping) 吗？",
+    "expected_source": "kalloc.c",
+    "retrieved_files": [
+      "entry.S",
+      "picirq.c",
+      "kalloc.c"
+    ],
+    "is_hit": true,
+    "expected_answer": "不会。xv6 根本没有实现按需分页 (Demand Paging)、页面置换 (OOM Killer/Swap) 等复杂的虚拟内存技术。物理内存耗尽时，后续的 kalloc 直接返回 0，这通常会导致 exec 失败或者 allocuvm panic，非常原始且暴力。",
+    "generated_answer": "Error: Error code: 404 - {'error': {'message': 'The model `xv6-expert` does not exist.', 'type': 'NotFoundError', 'param': None, 'code': 404}}",
+    "latency_seconds": 0.26
+  },
+  {
+    "id": 69,
+    "question": "在汇编中，SYS_read 这类常量的定义前缀是 T_ 还是 SYS_？有什么区别？",
+    "expected_source": "syscall.h",
+    "retrieved_files": [
+      "syscall.c",
+      "usys.S",
+      "syscall.h"
+    ],
+    "is_hit": true,
+    "expected_answer": "这是两套不同的常量体系。T_SYSCALL (64) 是中断向量号，代表 x86 的中断门索引。而 SYS_read, SYS_open 等是以 SYS_ 开头的宏（通常定义在 syscall.h 中），代表具体的系统调用服务编号，它们在中断发生前被塞进 EAX 寄存器传递给内核。",
+    "generated_answer": "Error: Error code: 404 - {'error': {'message': 'The model `xv6-expert` does not exist.', 'type': 'NotFoundError', 'param': None, 'code': 404}}",
+    "latency_seconds": 0.51
+  },
+  {
+    "id": 70,
+    "question": "为什么 xv6 的 printf.c (用户态) 的内部 buffer (buf) 限制只有很小的一段长度？",
+    "expected_source": "printf.c",
+    "retrieved_files": [
+      "usertests.c"
+    ],
+    "is_hit": false,
+    "expected_answer": "用户态的 printf 并不会真正无限制地缓冲输出。它主要是通过循环，边解析边调用 putc，然后 putc 每积攒够一点内容 (或遇到换行) 就会频繁调用底层的 write() 系统调用刷入内核缓冲区。这种轻缓冲设计牺牲了些许系统调用的开销，换来了极简的代码。",
+    "generated_answer": "Error: Error code: 404 - {'error': {'message': 'The model `xv6-expert` does not exist.', 'type': 'NotFoundError', 'param': None, 'code': 404}}",
+    "latency_seconds": 0.32
+  },
+  {
+    "id": 71,
+    "question": "sysfile.c 中的 sys_chdir 如果试图切换到一个名为 'file.txt' 的普通文件会怎样？",
+    "expected_source": "sysfile.c",
+    "retrieved_files": [
+      "sysfile.c",
+      "syscall.c"
+    ],
+    "is_hit": true,
+    "expected_answer": "它会失败。sys_chdir 在调用 namei 获取 inode 后，会立即检查 inode->type 是否等于 T_DIR。由于 'file.txt' 的类型是 T_FILE，检查失败，调用 iput 释放 inode 引用并直接向用户态返回 -1。",
+    "generated_answer": "Error: Error code: 404 - {'error': {'message': 'The model `xv6-expert` does not exist.', 'type': 'NotFoundError', 'param': None, 'code': 404}}",
+    "latency_seconds": 0.25
+  },
+  {
+    "id": 72,
+    "question": "当文件系统写入一个盘块 (bwrite) 时，如果底层 IDE 硬件发生了读写故障，内核能捕捉到并向用户态返回失败吗？",
+    "expected_source": "bio.c",
+    "retrieved_files": [
+      "bio.c",
+      "usertests.c",
+      "ide.c"
+    ],
+    "is_hit": true,
+    "expected_answer": "很难。xv6 的 buffer cache 设计非常简陋。bwrite 发起请求后，底层 iderw 若产生故障通常直接导致内核 panic（系统崩溃），或者数据静默丢失。它缺乏像 Linux 那样完善的向上传递 I/O 错误码的健壮机制。",
+    "generated_answer": "Error: Error code: 404 - {'error': {'message': 'The model `xv6-expert` does not exist.', 'type': 'NotFoundError', 'param': None, 'code': 404}}",
+    "latency_seconds": 0.24
+  },
+  {
+    "id": 73,
+    "question": "xv6 的 shell 如何支持后台进程的输出不干扰当前终端界面的？",
+    "expected_source": "sh.c",
+    "retrieved_files": [
+      "entry.S",
+      "picirq.c"
+    ],
+    "is_hit": false,
+    "expected_answer": "其实 xv6 的 shell 根本没有实现“不干扰”。当你在后台启动一个进程 (ls &)，父 shell 不阻塞，此时后台进程的输出和父 shell 的提示符 ($) 会在终端的字符缓冲区里发生严重的竞态混写，这是 xv6 控制台管理极其基础的表现。",
+    "generated_answer": "Error: Error code: 404 - {'error': {'message': 'The model `xv6-expert` does not exist.', 'type': 'NotFoundError', 'param': None, 'code': 404}}",
+    "latency_seconds": 0.23
+  },
+  {
+    "id": 74,
+    "question": "lapic.c 中，lapicw 向 EOI 寄存器写入 0 的数学本质是什么？",
+    "expected_source": "lapic.c",
+    "retrieved_files": [
+      "lapic.c"
+    ],
+    "is_hit": true,
+    "expected_answer": "EOI 寄存器本质上是 LAPIC 硬件状态机的一个“确认按钮”。向其内存映射的虚拟地址处写入任何值（比如 0），都相当于发出了一个电平脉冲信号，硬件捕捉到该信号后清零当前最高优先级的在服务位 (In-Service Register, ISR)。",
+    "generated_answer": "Error: Error code: 404 - {'error': {'message': 'The model `xv6-expert` does not exist.', 'type': 'NotFoundError', 'param': None, 'code': 404}}",
+    "latency_seconds": 0.22
+  },
+  {
+    "id": 75,
+    "question": "如果在 xv6 中尝试通过 open 打开一个文件描述符超过 16 次 (NOFILE)，会报什么错误？",
+    "expected_source": "sysfile.c",
+    "retrieved_files": [
+      "proc.c",
+      "usertests.c",
       "proc.h"
     ],
     "is_hit": false,
-    "expected_answer": "为了快速访问当前 CPU 的信息，xv6 利用了 x86 的段寄存器机制。在 mpmain() 中，将 CPU 的局部数据存放并用 %gs 寄存器指向它，通过 mycpu() 函数获取。",
-    "generated_answer": "在多核处理器下，每个 CPU 独有的数据结构 `struct cpu` 存储在数组 `cpus` 中。具体来说，`cpus[0]`、`cpus[1]`...`cpus[NCPU-1]` 分别对应于不同的 CPU 偏移量。例如，`cpus[cpu->apicid - 1]` 是当前 CPU 的对应项，其中 `cpu` 是一个指向 `struct cpu` 的指针，通常在某个循环中遍历这个数组来访问和更新每个 CPU的状态。",
-    "latency_seconds": 7.67
+    "expected_answer": "sys_open 内部会调用 fdalloc()。fdalloc 循环遍历当前进程的 16 个 fd 槽位。当 16 个全被占用时，它返回 -1 给 sys_open，随后 sys_open 释放文件结构体并向用户空间返回 -1。系统调用级别不区分具体的错误类型 (没有 errno)，只返回失败标志。",
+    "generated_answer": "Error: Error code: 404 - {'error': {'message': 'The model `xv6-expert` does not exist.', 'type': 'NotFoundError', 'param': None, 'code': 404}}",
+    "latency_seconds": 0.25
+  },
+  {
+    "id": 76,
+    "question": "mmu.h 中，将物理地址转化为 PDE 索引 (高 10 位) 的宏 PDX(va) 是怎么写的？",
+    "expected_source": "mmu.h",
+    "retrieved_files": [
+      "mmu.h",
+      "vm.c"
+    ],
+    "is_hit": true,
+    "expected_answer": "宏 PDX(va) 的实现是 `(((uint)(va) >> PDXSHIFT) & 0x3FF)`。它将虚拟地址先向右位移 22 位 (PDXSHIFT) 丢掉低位，然后使用 0x3FF (十进制 1023) 作为掩码截取最右边的 10 位，这正是页目录项数组的精确索引。",
+    "generated_answer": "Error: Error code: 404 - {'error': {'message': 'The model `xv6-expert` does not exist.', 'type': 'NotFoundError', 'param': None, 'code': 404}}",
+    "latency_seconds": 0.24
+  },
+  {
+    "id": 77,
+    "question": "在 x86 系统中，系统调用陷入内核态后，栈会自动切换吗？谁负责这件事？",
+    "expected_source": "mmu.h",
+    "retrieved_files": [
+      "proc.h",
+      "lapic.c",
+      "x86.h"
+    ],
+    "is_hit": false,
+    "expected_answer": "会自动切换。硬件 (CPU) 在执行 int $0x40 指令陷入内核的瞬间，会自动去任务状态段 (TSS) 中读取 ESP0 的值，将当前的栈指针强行切换到 TSS 指定的内核栈上。这是纯硬件行为，xv6 仅负责在启动进程时将正确的栈底地址填入 TSS。",
+    "generated_answer": "Error: Error code: 404 - {'error': {'message': 'The model `xv6-expert` does not exist.', 'type': 'NotFoundError', 'param': None, 'code': 404}}",
+    "latency_seconds": 0.22
+  },
+  {
+    "id": 78,
+    "question": "syscall.c 中的 syscalls 数组存放了什么？",
+    "expected_source": "syscall.c",
+    "retrieved_files": [
+      "syscall.c"
+    ],
+    "is_hit": true,
+    "expected_answer": "它存放了所有的系统调用处理函数的函数指针 (Function Pointers)。它被定义为一个无参数返回 int 的函数指针数组，索引下标正是对应的系统调用号 (如 SYS_read 等于 5)，从而实现了 O(1) 的分发调度。",
+    "generated_answer": "Error: Error code: 404 - {'error': {'message': 'The model `xv6-expert` does not exist.', 'type': 'NotFoundError', 'param': None, 'code': 404}}",
+    "latency_seconds": 0.38
+  },
+  {
+    "id": 79,
+    "question": "xv6 中的 wc 命令 (Word Count) 如何判断一个字符是不是空白符？",
+    "expected_source": "wc.c",
+    "retrieved_files": [
+      "usertests.c",
+      "wc.c"
+    ],
+    "is_hit": true,
+    "expected_answer": "它没有引用标准 C 库的 isspace() 函数，而是手写了极其暴力的判断逻辑。它直接将读取到的字符与 ' ', '\\r', '\\n', '\\t', '\\v', '\\f' 逐一对比。遇到任意一个都被视为空白符的分割边界，用于切分单词。",
+    "generated_answer": "Error: Error code: 404 - {'error': {'message': 'The model `xv6-expert` does not exist.', 'type': 'NotFoundError', 'param': None, 'code': 404}}",
+    "latency_seconds": 0.43
+  },
+  {
+    "id": 80,
+    "question": "xv6 的 grep 命令不支持正则表达式中极其常见的通配符 '*', 它支持哪个类似的符号？",
+    "expected_source": "grep.c",
+    "retrieved_files": [
+      "grep.c"
+    ],
+    "is_hit": true,
+    "expected_answer": "xv6 的 grep.c 提供了一个极简版本的状态机。它不支持经典的星号匹配，但支持 '.' (匹配任意单字符)、'^' (匹配行首) 和 '$' (匹配行尾)。任何想要输入 '*' 的尝试都只会被当做普通字符字面量去匹配。",
+    "generated_answer": "Error: Error code: 404 - {'error': {'message': 'The model `xv6-expert` does not exist.', 'type': 'NotFoundError', 'param': None, 'code': 404}}",
+    "latency_seconds": 0.27
   }
 ]

@@ -44,6 +44,7 @@
 !*.ts
 !*.json
 !*.md
+!*.sh
 
 # ==========================================
 # 5. 绝对封杀：二次屏蔽环境依赖与编译产物
@@ -76,5 +77,6 @@ node_modules/
 .idea/
 .DS_Store
 Thumbs.db
-
+out/
+qwen-xv6-lora/
 xv6-source/

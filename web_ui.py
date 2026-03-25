@@ -4,7 +4,7 @@ import time
 
 # --- 1. 配置参数 ---
 # 这是你刚才启动的 FastAPI 后端地址
-API_URL = "http://localhost:8080/chat"
+API_URL = "http://localhost:8081/chat"
 
 st.set_page_config(page_title="xv6 OS Agent", page_icon="🐧", layout="centered")
 st.title("🐧 xv6 内核源码 Agent")

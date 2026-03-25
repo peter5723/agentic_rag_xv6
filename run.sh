@@ -1,0 +1,3 @@
+# nohup python -m vllm.entrypoints.openai.api_server --model ./models/qwen-7b --tensor-parallel-size 1 --gpu-memory-utilization 0.95 --max-model-len 4096  --trust-remote-code &
+# nohup python -m vllm.entrypoints.openai.api_server --model ./models/qwen-7b --tensor-parallel-size 1 --gpu-memory-utilization 0.95 --max-model-len 4096 --enable-lora --lora-modules xv6-expert=./qwen-xv6-lora  --max-loras 1 --max-lora-rank 16 &
+nohup python -m vllm.entrypoints.openai.api_server --model ./models/qwen-7b --tensor-parallel-size 1 --gpu-memory-utilization 0.95 --max-model-len 4096 --enable-lora --lora-modules xv6-expert=./out/dpo_512.pth  --max-loras 1 --max-lora-rank 16 &

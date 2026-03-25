@@ -1,0 +1,972 @@
+[
+  {
+    "question": "在 xv6 系统启动时，bootasm.S 的主要任务是什么？",
+    "expected_answer": "bootasm.S 主要负责将 CPU 从 16 位实模式切换到 32 位保护模式。它通过开启 A20 地址线，加载全局描述符表 (GDT)，并将 CR0 寄存器的 PE (Protection Enable) 位置 1 来完成切换，最后跳转到 32 位代码段执行 bootmain。",
+    "source_file": "bootasm.S"
+  },
+  {
+    "question": "bootmain.c 中的 bootmain() 函数是如何找到并加载内核 ELF 文件的？",
+    "expected_answer": "bootmain() 从磁盘的第 1 个扇区（0号扇区是引导扇区）读取 ELF 头部 (elfhdr)。验证 ELF 魔数后，它根据程序头表 (proghdr) 中的偏移量和大小，将内核的各个段从磁盘读取到物理内存的指定位置 (paddr)。",
+    "source_file": "bootmain.c"
+  },
+  {
+    "question": "mappages() 函数在虚拟内存管理中的作用是什么？如果发生地址重映射会怎样？",
+    "expected_answer": "mappages 用于将一段虚拟地址范围映射到一段连续的物理地址上。它通过 walkpgdir 逐页建立 PTE。如果它发现某个要映射的 PTE 已经被占用（即 PTE_P 位为 1），它会直接触发 panic('remap') 导致系统崩溃。",
+    "source_file": "vm.c"
+  },
+  {
+    "question": "xv6 的页表机制中，V2P 和 P2V 宏的作用是什么？",
+    "expected_answer": "V2P 用于将内核空间的虚拟地址转换为物理地址（减去 KERNBASE 0x80000000），而 P2V 用于将物理地址转换为内核虚拟地址（加上 KERNBASE）。它们仅在内核初始化或直接操作物理内存时使用。",
+    "source_file": "memlayout.h"
+  },
+  {
+    "question": "allocuvm() 函数在分配用户空间内存时，底层会调用什么函数？",
+    "expected_answer": "allocuvm 会在一个 for 循环中，多次调用 kalloc() 来分配物理内存页。每次分配后，它会使用 memset 将新页清零，并调用 mappages 将其映射到用户虚拟地址空间。",
+    "source_file": "vm.c"
+  },
+  {
+    "question": "如果 deallocuvm() 释放用户内存空间，它是如何清理物理页的？",
+    "expected_answer": "deallocuvm 遍历需要释放的虚拟地址范围。如果对应地址的 PTE_P 位有效，它会提取物理地址并调用 kfree() 释放物理页，然后将 PTE 清零。",
+    "source_file": "vm.c"
+  },
+  {
+    "question": "exec() 函数是如何处理可执行文件传递的参数 (argc 和 argv) 的？",
+    "expected_answer": "exec 会在用户栈 (USTACK) 的顶部为参数字符串分配空间。然后，它构造一个指针数组 (argv) 指向这些字符串，并将 argc 和 argv 数组本身的地址压入栈中，伪造成像从 main(argc, argv) 正常调用的栈帧结构。",
+    "source_file": "exec.c"
+  },
+  {
+    "question": "xv6 中的 sys_sbrk() 系统调用是如何增加进程堆内存的？",
+    "expected_answer": "sys_sbrk 首先获取进程当前的大小 (myproc()->sz)。然后调用 growproc(n) 函数。如果 n > 0，growproc 会调用 allocuvm 增加内存；最后 sys_sbrk 返回增加前的旧内存边界地址。",
+    "source_file": "sysproc.c"
+  },
+  {
+    "question": "trap() 函数是如何区分时钟中断和系统调用异常的？",
+    "expected_answer": "trap() 检查传入的 trapframe 结构体中的 tf->trapno 字段。如果是 T_SYSCALL，它会调用 syscall()；如果是 T_IRQ0 + IRQ_TIMER，它会执行时钟中断的处理逻辑，并可能在最后调用 yield() 让出 CPU。",
+    "source_file": "trap.c"
+  },
+  {
+    "question": "在系统调用分发函数 syscall() 中，如何获取系统调用号？",
+    "expected_answer": "syscall() 会从当前进程的 trapframe 中的 eax 寄存器 (myproc()->tf->eax) 获取系统调用号。如果该号码合法，它会在 syscalls 函数指针数组中找到对应的处理函数并执行。",
+    "source_file": "syscall.c"
+  },
+  {
+    "question": "sys_kill() 真的会立刻杀死进程吗？它的底层机制是什么？",
+    "expected_answer": "不会立刻杀死进程。sys_kill 只是遍历进程表，找到对应 PID 的进程，并将其 killed 标志位置为 1。如果目标进程处于 SLEEPING 状态，它会将其状态改为 RUNNABLE 以便它能被调度并在 trap 返回用户态时发现自己被 kill 从而调用 exit()。",
+    "source_file": "sysproc.c"
+  },
+  {
+    "question": "allocproc() 函数在进程表中寻找空闲槽位 (UNUSED) 时，需要加锁吗？为什么？",
+    "expected_answer": "需要加锁。allocproc 必须先获取 ptable.lock，以防止多个 CPU 同时遍历进程表并分配了同一个 UNUSED 状态的槽位导致冲突。找到空闲槽位并修改状态后才释放锁。",
+    "source_file": "proc.c"
+  },
+  {
+    "question": "yield() 函数是如何让出 CPU 的？",
+    "expected_answer": "yield 主要是修改当前进程的状态为 RUNNABLE，然后调用 sched()。sched() 会进行一些安全检查（比如确保持有 ptable.lock 且关中断），然后调用 swtch(&p->context, mycpu()->scheduler) 切换到调度器上下文。",
+    "source_file": "proc.c"
+  },
+  {
+    "question": "xv6 为什么需要 ptable.lock 这个大内核锁？",
+    "expected_answer": "ptable.lock 用于保护全局进程表 (ptable)。任何可能改变进程状态 (如 sleep, wakeup, exit, yield) 或在进程之间切换上下文的操作，都必须持有此锁，以保证调度的一致性。",
+    "source_file": "proc.c"
+  },
+  {
+    "question": "popcli() 函数的作用是什么？它和直接调用 sti 开启中断有什么区别？",
+    "expected_answer": "popcli 用于配对 pushcli() 以管理中断状态。xv6 支持锁的嵌套，当前 CPU 的 ncli 字段记录了嵌套层数。popcli 会将 ncli 减 1，只有当 ncli 减到 0，且 CPU 原本是开启中断状态时，才会真正执行 sti 开启中断。",
+    "source_file": "spinlock.c"
+  },
+  {
+    "question": "在 xv6 的文件系统中，ialloc() 函数是如何在磁盘上分配一个新的 inode 的？",
+    "expected_answer": "ialloc 遍历超级块 (superblock) 中描述的 inode 区域。它一次读取一个磁盘块到 bcache，扫描块中的 struct dinode，寻找 type == 0 (空闲) 的节点。找到后将其 type 置为指定类型并写回磁盘。",
+    "source_file": "fs.c"
+  },
+  {
+    "question": "bmap() 函数在文件系统中的职责是什么？",
+    "expected_answer": "bmap(ip, bn) 负责将文件内部的逻辑块号 (bn) 映射到磁盘上的物理块号。如果该逻辑块是直接块且未分配，它会调用 balloc 分配物理块；如果属于间接块，它会读取一级间接块表进行映射分配。",
+    "source_file": "fs.c"
+  },
+  {
+    "question": "filealloc() 函数在哪里寻找空闲的文件结构体？",
+    "expected_answer": "filealloc 扫描全局文件表 ftable.file 数组，寻找引用计数 (f->ref) 为 0 的 struct file 结构体。找到后将引用计数置为 1 并返回。整个过程由 ftable.lock 保护。",
+    "source_file": "file.c"
+  },
+  {
+    "question": "sys_open() 系统调用在尝试打开一个不存在的文件并指定 O_CREATE 标志时，会调用哪个底层函数？",
+    "expected_answer": "它会调用 create() 函数。create 会解析路径名，找到目标目录的 inode，然后调用 ialloc 分配一个新的 inode，并通过 dirlink 将新文件名和 inode 号写入目标目录的数据块中。",
+    "source_file": "sysfile.c"
+  },
+  {
+    "question": "xv6 中的 dirlink() 函数是如何向目录中添加新条目的？",
+    "expected_answer": "dirlink 遍历目录 inode 的数据块，寻找 inum == 0 的空闲 struct dirent 条目。找到后，将新的 inode 号和文件名写入该条目，并调用 iupdate 将目录的更改写回磁盘。",
+    "source_file": "fs.c"
+  },
+  {
+    "question": "当文件引用计数减到 0 时，fileclose() 函数会发生什么？",
+    "expected_answer": "fileclose 会减少文件的引用计数 (ref)。如果减到 0，它会根据文件的类型 (FD_PIPE 或 FD_INODE) 进行相应的清理操作。如果是 INODE，它会调用 iput() 释放 inode 的内存引用。",
+    "source_file": "file.c"
+  },
+  {
+    "question": "iput() 函数在什么情况下会真正截断 (truncate) 并删除文件？",
+    "expected_answer": "当 iput 发现当前 inode 在内存中的引用计数 (ip->ref) 为 1，且文件系统中的硬链接数 (ip->nlink) 为 0 时。这说明没有进程打开它且目录中也没有它的名字了，此时它会调用 itrunc 释放其所有数据块。",
+    "source_file": "fs.c"
+  },
+  {
+    "question": "bget() 函数如果找不到目标磁盘块的缓存，它是如何选择牺牲块的？",
+    "expected_answer": "bget 会从双向链表的尾部 (bcache.head.prev) 开始向前遍历，寻找引用计数 (b->refcnt) 为 0 且没有任何进程等待它 (b->flags & B_DIRTY 为 0) 的块作为牺牲块，重新分配给新的扇区号。",
+    "source_file": "bio.c"
+  },
+  {
+    "question": "ide 驱动中的 idestart() 函数是通过什么方式与磁盘硬件通信的？",
+    "expected_answer": "idestart 通过 x86 的 outb 指令向磁盘控制器的特定 I/O 端口写入扇区数量、LBA 地址和命令码（如 IDE_CMD_READ 或 IDE_CMD_WRITE），从而触发硬件操作。",
+    "source_file": "ide.c"
+  },
+  {
+    "question": "xv6 中的 log_write() 机制（日志系统）是为了解决什么问题？",
+    "expected_answer": "日志机制是为了防止系统崩溃导致的文件系统不一致问题（Crash Recovery）。log_write 不会立刻将数据写入最终位置，而是先写到磁盘的日志区，只有当完整的事务被 commit() 后，才将日志区的数据写回最终扇区。",
+    "source_file": "log.c"
+  },
+  {
+    "question": "begin_op() 和 end_op() 两个函数在文件系统事务操作中扮演什么角色？",
+    "expected_answer": "它们划定了文件系统事务的边界。begin_op() 确保当前日志区有足够的空间存放即将到来的修改；end_op() 会递减未决操作计数，如果计数归零，它将触发 commit() 将事务刷入磁盘。",
+    "source_file": "log.c"
+  },
+  {
+    "question": "在 trap 处理中，如果内核发生了 page fault (页面错误)，xv6 的默认行为是什么？",
+    "expected_answer": "由于 xv6 并没有实现复杂的内核态按需分页或写时复制 (COW)，如果在内核态 (tf->cs & 3 == 0) 发生 page fault，trap() 会认为这是一个内核 Bug，直接调用 panic('trap') 使系统崩溃。",
+    "source_file": "trap.c"
+  },
+  {
+    "question": "sys_read() 函数在读取 inode 文件数据时，底层调用的函数是谁？",
+    "expected_answer": "sys_read 会提取文件描述符，通过 ftable 找到对应的 struct file，然后调用 fileread()。fileread 进一步判断如果它是 inode 文件，则加锁后调用 readi() 读取具体数据块。",
+    "source_file": "file.c"
+  },
+  {
+    "question": "xv6 初始化硬件设备时，lapicinit() 的作用是什么？",
+    "expected_answer": "lapicinit 用于初始化多核系统中的本地高级可编程中断控制器 (Local APIC)。它设置了定时器 (Timer) 频率并开启本地中断接收，使得当前 CPU 能够接收到周期性的时钟中断从而进行进程调度。",
+    "source_file": "lapic.c"
+  },
+  {
+    "question": "在 xv6 内核中，如果一个进程由于触发了除零异常而被系统强制杀死，它的父进程如何获取它的退出状态？",
+    "expected_answer": "被杀死的子进程在 trap 中退出时，内核并不像 Linux 那样向 wait() 返回详细的异常信号。xv6 极其精简，任何被杀死的进程都会直接退出，父进程的 wait() 只能感知到子进程已终止，但无法细粒度获取它是由于除零错误而死的。",
+    "source_file": "trap.c"
+  },
+  {
+    "question": "xv6 中的 namei() 和 nameiparent() 函数有什么区别？",
+    "expected_answer": "namei() 解析给定路径并返回目标文件或目录的 inode。而 nameiparent() 解析路径，但在最后一层停止，返回目标文件所在父目录的 inode，并将最后一级的文件名存入传入的 name 缓冲区中，常用于创建或删除文件。",
+    "source_file": "fs.c"
+  },
+  {
+    "question": "dirlookup() 函数在目录数据块中查找文件名时，如果找到了目标，它会返回什么？",
+    "expected_answer": "如果找到了匹配的文件名，它会调用 iget() 获取该文件的 inode 并返回其指针。同时，如果传入了 poff 指针，它还会将该条目在目录文件中的字节偏移量 (offset) 存入 poff，方便后续修改或删除该条目。",
+    "source_file": "fs.c"
+  },
+  {
+    "question": "writei() 函数是如何向 inode 中追加数据的？如果跨越了盘块边界怎么处理？",
+    "expected_answer": "writei 通过 bmap() 获取逻辑块对应的物理块号，调用 bread() 读取该块，然后将用户数据 memmove 到缓冲区中并 bwrite() 写回。如果写入的数据跨越了块边界 (BSIZE)，它会在一个 while 循环中多次调用 bmap 和 bread 逐块处理。",
+    "source_file": "fs.c"
+  },
+  {
+    "question": "sys_link() 系统调用 (创建硬链接) 的核心逻辑是什么？",
+    "expected_answer": "sys_link 首先用 namei 找到旧文件的 inode，将其 nlink (链接数) 加 1 并 iupdate 写回磁盘。然后用 nameiparent 找到新路径的父目录 inode，调用 dirlink 在父目录中插入一个指向旧文件 inode 号的新目录项。",
+    "source_file": "sysfile.c"
+  },
+  {
+    "question": "sys_unlink() 是如何删除目录树中的文件的？",
+    "expected_answer": "sys_unlink 使用 nameiparent 找到父目录的 inode，遍历数据块找到对应的目录项。将其 inode 号清零以抹除名字，然后获取目标文件的 inode，将其 nlink 减 1 并写回。真正的磁盘空间释放交由 iput() 在 nlink==0 且 ref==0 时处理。",
+    "source_file": "sysfile.c"
+  },
+  {
+    "question": "fdalloc() 函数是如何为当前进程分配新的文件描述符的？",
+    "expected_answer": "fdalloc 遍历当前进程的 myproc()->ofile 数组 (大小为 NOFILE，通常为 16)。它寻找第一个值为 0 (空闲) 的槽位，将其分配给传入的文件结构体指针，并返回该槽位的索引号作为文件描述符 (fd)。",
+    "source_file": "file.c"
+  },
+  {
+    "question": "在 fork() 时，子进程不仅复制了父进程的内存，还复制了什么与文件相关的结构？",
+    "expected_answer": "子进程会完整复制父进程的 ofile 数组（已打开的文件描述符）和 cwd（当前工作目录）。对于每个复制的项，fork 会调用 filedup() 增加文件的引用计数 (ref)，并调用 idup() 增加工作目录 inode 的引用计数。",
+    "source_file": "proc.c"
+  },
+  {
+    "question": "filestat() 函数是如何获取文件元信息的？",
+    "expected_answer": "filestat 接收一个 struct stat 指针。如果文件是 FD_INODE 类型，它会调用 stati() 函数。stati 将 inode 内部的 type, dev, inum, nlink, size 等关键字段复制到 stat 结构体中并返回给用户态。",
+    "source_file": "file.c"
+  },
+  {
+    "question": "filewrite() 函数如何区分对管道和对普通文件的写入？",
+    "expected_answer": "filewrite 会检查文件的类型。如果是 FD_PIPE，它直接调用 pipewrite() 写入内存环形缓冲区；如果是 FD_INODE，它会调用 begin_op() 开启日志事务，调用 ilock() 锁住 inode，然后调用 writei() 将数据写入磁盘，最后 end_op() 提交事务。",
+    "source_file": "file.c"
+  },
+  {
+    "question": "bwrite() 函数在修改缓存块后，为什么要设置 B_DIRTY 标志？",
+    "expected_answer": "B_DIRTY 标志告诉 buffer cache 机制，该内存块的内容已经被修改，与磁盘上的数据不一致了。当后续需要释放或复用该块时，必须先将带有 B_DIRTY 的块通过 iderw() 刷入磁盘硬件。",
+    "source_file": "bio.c"
+  },
+  {
+    "question": "copyout() 函数的作用是什么？它是如何保证安全的？",
+    "expected_answer": "copyout 用于将内核空间的数据安全地拷贝到用户空间的指定虚拟地址。它通过检查目标用户地址是否超出了进程的大小限制 (myproc()->sz) 来防止越界写，然后直接使用 memmove 进行拷贝，因为此时内核的页表包含了完整的用户空间映射。",
+    "source_file": "vm.c"
+  },
+  {
+    "question": "fetchint() 函数在系统调用参数传递中扮演什么角色？",
+    "expected_answer": "用户态程序触发系统调用时，参数保存在用户栈中。fetchint 负责从指定的用户栈虚拟地址安全地读取一个 32 位整数（通常是指针或系统调用参数）。它会严格检查传入的地址是否越界。",
+    "source_file": "syscall.c"
+  },
+  {
+    "question": "argstr() 函数是如何安全地从用户空间提取字符串参数的？",
+    "expected_answer": "argstr 先通过 argptr 获取字符串指针，然后调用 fetchstr()。fetchstr 遍历用户空间字符串的每个字符，直到遇到 '\\0'。它会在每一步检查地址是否达到进程内存上限，防止恶意用户传递未闭合的字符串导致内核越界读取。",
+    "source_file": "syscall.c"
+  },
+  {
+    "question": "kfree() 在释放物理内存页时，为什么要将整页内容 memset 为 1？",
+    "expected_answer": "这是为了防止“释放后使用 (Use-After-Free)”的野指针 Bug。通过将内存填充为垃圾数据 (值为 1 的字节)，如果有悬挂指针继续访问这块被释放的内存，程序极大概率会立刻崩溃，从而尽早暴露内存错误。",
+    "source_file": "kalloc.c"
+  },
+  {
+    "question": "freerange() 在初始化空闲内存链表时，是如何对齐地址的？",
+    "expected_answer": "freerange 使用 PGROUNDUP 宏将起始地址向上取整到 4KB 页边界，并确保结束地址在页边界内。然后它在一个循环中遍历每一页，逐页调用 kfree() 将它们挂载到 kmem.freelist 链表中。",
+    "source_file": "kalloc.c"
+  },
+  {
+    "question": "switchuvm() 函数在进程切换时，是如何更新硬件页表寄存器的？",
+    "expected_answer": "switchuvm 被调度器调用。它首先关闭中断，然后更新当前 CPU 的任务状态段 (TSS) 中的 esp0 以指向新进程的内核栈顶。最后，它将新进程的页目录物理地址 (V2P(p->pgdir)) 加载到 CR3 寄存器中，从而切换了整个虚拟地址空间。",
+    "source_file": "vm.c"
+  },
+  {
+    "question": "switchkvm() 的作用是什么？它通常在什么时候被调用？",
+    "expected_answer": "switchkvm 用于将 CPU 的 CR3 寄存器切换到只包含内核映射的全局页目录 (kpgdir)。它通常在调度器 (scheduler) 没有运行任何用户进程时调用，或者在系统初始化初期建立基础内存映射时调用。",
+    "source_file": "vm.c"
+  },
+  {
+    "question": "inituvm() 是如何将 initcode 的二进制指令加载到第一个进程的内存中的？",
+    "expected_answer": "inituvm 首先调用 kalloc 分配一个物理页，将其 memset 清零。然后在这个物理页映射的 PTE 中设置 PTE_U (用户可访问) 等标志，最后使用 memmove 将 initcode 数组的内容直接拷贝到这个物理页的开头。",
+    "source_file": "vm.c"
+  },
+  {
+    "question": "loaduvm() 函数在加载 ELF 文件数据段时是如何工作的？",
+    "expected_answer": "loaduvm 接收虚拟地址和文件偏移。它通过 walkpgdir 找到虚拟地址对应的物理页地址，然后调用 readi() 直接从 inode 中读取文件数据到该物理页。如果数据跨越多页，它会在循环中逐页读取并映射。",
+    "source_file": "vm.c"
+  },
+  {
+    "question": "wait() 函数在遍历进程表寻找 ZOMBIE 进程时，如果找到了会怎么做？",
+    "expected_answer": "如果找到了 ZOMBIE 子进程，wait 会提取其 PID，调用 kfree 释放子进程的内核栈 (kstack)，调用 freevm 释放其页表和用户内存。最后将该子进程的状态设为 UNUSED，清理进程名和父进程指针，并返回其 PID。",
+    "source_file": "proc.c"
+  },
+  {
+    "question": "scheduler() 的无限循环中，为什么在找到 RUNNABLE 进程后，要调用 sti() 开启中断？",
+    "expected_answer": "在 acquire(&ptable.lock) 时中断会被关闭。但在调度器循环内部如果一直找不到 RUNNABLE 进程，如果不短暂地释放锁并 sti 开启中断，CPU 就无法接收时钟或设备中断，导致整个系统死锁。所以调度器会在循环中进行短暂的开闭中断操作。",
+    "source_file": "proc.c"
+  },
+  {
+    "question": "sched() 函数在调用 swtch() 之前，为什么要做严格的状态断言 (panic 检查)？",
+    "expected_answer": "为了保证内核调度的绝对安全。sched 会检查当前是否持有 ptable.lock，是否已经关闭了中断 (ncli == 1)，以及当前进程的状态是否不再是 RUNNING。任何一条不满足都说明调度逻辑出错，必须 panic。",
+    "source_file": "proc.c"
+  },
+  {
+    "question": "汇编函数 swtch(struct context **old, struct context *new) 保存了哪些寄存器？",
+    "expected_answer": "swtch 只保存了被调用者保存 (callee-saved) 的寄存器：ebp, ebx, esi, edi，以及通过 call 指令自动压入栈的 eip (返回地址)。它不保存 eax, ecx, edx，因为 C 语言的调用约定允许被调用函数自由修改这些寄存器。",
+    "source_file": "swtch.S"
+  },
+  {
+    "question": "sleep() 函数在进入休眠前，为什么要将传入的锁释放，并获取 ptable.lock？",
+    "expected_answer": "为了避免死锁并保证原子性。sleep 必须获取 ptable.lock 才能修改自己的状态并调用 sched() 切换上下文。但如果带着传入的锁去休眠，其他试图唤醒它的进程可能需要这把锁，从而导致死锁。因此在持有 ptable.lock 后，就可以安全地释放传入的锁了。",
+    "source_file": "proc.c"
+  },
+  {
+    "question": "wakeup() 函数是如何唤醒等待特定频道 (chan) 的进程的？",
+    "expected_answer": "wakeup 需要先获取 ptable.lock。然后遍历整个进程表，寻找状态为 SLEEPING 且 p->chan 等于目标频道的进程。找到后，将其状态直接修改为 RUNNABLE，等待调度器在下一轮将其调度上 CPU。",
+    "source_file": "proc.c"
+  },
+  {
+    "question": "自旋锁 acquire() 中的 xchg 汇编指令为什么是实现锁的核心？",
+    "expected_answer": "xchg 指令在硬件层面上原子性地交换寄存器和内存地址的值。acquire 通过一个 while 循环使用 xchg 将 1 写入锁变量并读出旧值。只有当读出的旧值为 0 时，说明锁原本是空闲的，当前 CPU 成功抢到了锁，循环结束。",
+    "source_file": "spinlock.c"
+  },
+  {
+    "question": "holding() 函数是如何判断当前 CPU 是否持有某把自旋锁的？",
+    "expected_answer": "holding 会检查两个条件：首先锁的 locked 字段必须为 1，其次锁的 cpu 指针必须指向当前正在执行代码的 CPU (即 lk->cpu == mycpu())。这常用于调试和内核断言 (panic)。",
+    "source_file": "spinlock.c"
+  },
+  {
+    "question": "中断发生时，alltraps 汇编标签主要向栈中压入了什么？",
+    "expected_answer": "硬件压入了 trapno, err, eip, cs, eflags 等状态。alltraps 则负责保存软件上下文，它依次 pushl %ds, %es, %fs, %gs，然后执行 pushal 指令将通用寄存器全部压栈，最后建立 C 语言需要的参数栈，跳转到 trap() 函数。",
+    "source_file": "trapasm.S"
+  },
+  {
+    "question": "trapret 标签是如何从内核态返回用户态的？",
+    "expected_answer": "trapret 是 alltraps 的逆过程。它执行 popal 恢复通用寄存器，接着 popl 恢复段寄存器 ds, es, fs, gs。最后执行 addl 跳过 trapno 和 err 字段，执行 iret 指令。硬件会根据 iret 弹出 eip, cs, eflags 并切换权限级别。",
+    "source_file": "trapasm.S"
+  },
+  {
+    "question": "idtinit() 函数是如何初始化中断描述符表 (IDT) 的？",
+    "expected_answer": "idtinit 遍历 256 个中断向量。使用 SETGATE 宏，将 vectors 数组中预先生成的汇编入口地址填充到 IDT 表的相应位置，配置好权限特权级 (DPL)。对于系统调用 (T_SYSCALL)，DPL 被设为 DPL_USER 允许用户态触发。",
+    "source_file": "trap.c"
+  },
+  {
+    "question": "picenable() 函数的作用是什么？",
+    "expected_answer": "在传统的单核或兼容模式下，可编程中断控制器 (PIC) 负责管理硬件中断。picenable 通过向 PIC 的 I/O 端口写入特定的掩码位，来解除对特定外部硬件中断（如键盘 IRQ 1 或 时钟 IRQ 0）的屏蔽。",
+    "source_file": "picirq.c"
+  },
+  {
+    "question": "ioapicenable() 在多核系统中扮演什么角色？",
+    "expected_answer": "在多核系统中，IOAPIC 取代了老式的 PIC。ioapicenable 用于配置 IOAPIC 的重定向表项 (Redirection Table Entry)。它指定了某个外部硬件中断（如磁盘中断）应该被路由到哪个特定的 CPU 核心，或者广播给所有核心。",
+    "source_file": "ioapic.c"
+  },
+  {
+    "question": "consoleintr() 函数在处理键盘输入时，遇到 Ctrl+D (EOF) 会如何处理？",
+    "expected_answer": "consoleintr 维护了一个输入环形缓冲区。如果检测到输入的字符是 Ctrl+D (ASCII 值 4)，它不会将其作为可见字符回显，而是会将其视作文件结束符，停止读取并调用 wakeup 唤醒正在 sys_read 等待终端输入的进程。",
+    "source_file": "console.c"
+  },
+  {
+    "question": "kbdintr() 是如何从键盘硬件获取扫描码的？",
+    "expected_answer": "键盘控制器触发硬件中断后， trap() 会调用 kbdintr()。kbdintr 使用 inb(0x64) 读取状态寄存器判断是否有数据，然后使用 inb(0x60) 从数据端口读取实际的键盘扫描码 (Scan Code)，并进一步将其转换为 ASCII 字符。",
+    "source_file": "kbd.c"
+  },
+  {
+    "question": "uartputc() 在向串口发送字符时为什么要轮询？",
+    "expected_answer": "串口芯片的发送缓冲区可能已满。uartputc 通过 inb() 轮询串口的线状态寄存器 (LSR)。只要 LSR 的特定位表明发送缓冲队列未空，它就会做极短的微秒级延迟循环等待，直到有空间后，再用 outb() 将字符写入发送寄存器。",
+    "source_file": "uart.c"
+  },
+  {
+    "question": "cprintf() 函数的实现底层依赖哪个输出例程？",
+    "expected_answer": "cprintf 的底层最终会调用 consoleputc()。它负责解析格式化字符串 (如 %d, %s)，将其展开为具体的字符流，然后通过 consoleputc 将字符同时输出到显示器显存 (CGA) 和串口 (UART) 中。",
+    "source_file": "console.c"
+  },
+  {
+    "question": "当内核调用 panic() 时，最后执行的操作是什么？",
+    "expected_answer": "panic 会首先打印传入的错误字符串。随后，它调用 cli() 永久关闭当前 CPU 的中断，防止被其它事件打断，然后进入一个死循环 (for(;;) ;)，使得系统完全挂起，保留现场以供调试。",
+    "source_file": "console.c"
+  },
+  {
+    "question": "waitdisk() 函数在 ide 驱动中如何判断磁盘已准备好接受命令？",
+    "expected_answer": "waitdisk 通过不断读取 IDE 控制器的状态寄存器端口 (0x1F7)。它会等待直到最高位 BSY (Busy) 被清零，且 RDY (Ready) 位被置 1。这表明磁盘已经完成了上一次寻道或读写，可以接受新命令了。",
+    "source_file": "ide.c"
+  },
+  {
+    "question": "bootmain.c 中的 readsect() 函数是如何发起硬件磁盘读取的？",
+    "expected_answer": "readsect 先调用 waitdisk() 等待磁盘空闲。然后通过 outb() 依次向 0x1F2~0x1F6 端口写入读取扇区数和 LBA 地址。接着向 0x1F7 端口发出 0x20 (读命令)。最后再次 waitdisk 并使用 insl 汇编指令从 0x1F0 端口读取 512 字节的数据到内存。",
+    "source_file": "bootmain.c"
+  },
+  {
+    "question": "memset() 底层通常利用什么 x86 汇编指令来提高效率？",
+    "expected_answer": "xv6 的 memset 会利用 x86 的 stosb 汇编指令。stosb 可以将 al 寄存器中的值存储到 edi 寄存器指向的内存地址中。通过配合 rep 前缀，它可以让硬件直接在微指令层面高速连续填充内存块，比 C 语言的 for 循环快得多。",
+    "source_file": "string.c"
+  },
+  {
+    "question": "memmove() 函数在拷贝内存时，如何处理源地址和目标地址重叠 (Overlap) 的情况？",
+    "expected_answer": "memmove 会比较源地址 (src) 和目标地址 (dst)。如果 dst < src，说明从前往后拷贝是安全的。但如果 src < dst 且有重叠，从前往后拷贝会覆盖源数据。此时 memmove 会从后往前拷贝 (d += n, s += n，倒序循环)，从而保证数据完整。",
+    "source_file": "string.c"
+  },
+  {
+    "question": "safestrcpy() 相比于标准库的 strcpy 有什么安全保障？",
+    "expected_answer": "普通的 strcpy 会无限拷贝直到遇到 '\\0'，极易导致缓冲区溢出。safestrcpy 接收目标缓冲区的最大长度 n，它最多只拷贝 n-1 个字符，并且强制将最后一个字节 dst[n-1] 设为 '\\0'，绝对保证字符串有 null 终止符。",
+    "source_file": "string.c"
+  },
+  {
+    "question": "mpinit() 函数的作用是解析什么结构？",
+    "expected_answer": "mpinit 用于解析 Intel 多处理器 (MP) 规范的配置表。它会在内存的特定区域 (如 BIOS ROM 或物理地址顶部) 搜索 MP Floating Pointer 签名 ('_MP_')，解析配置表以获取系统有多少个 CPU 核心、IOAPIC 的地址等硬件拓扑信息。",
+    "source_file": "mp.c"
+  },
+  {
+    "question": "主 CPU 是如何启动其他辅助 CPU (AP) 的？",
+    "expected_answer": "在 lapicstartap() 中，主 CPU 会通过 LAPIC 的中断命令寄存器 (ICR) 发送特殊的核间中断 (IPI)。首先发送 INIT IPI 重置目标核心，然后延迟一段时间，再发送 SIPI (Startup IPI) 并携带一个物理地址。辅助核心收到 SIPI 后，会直接从该物理地址开始执行汇编启动代码。",
+    "source_file": "lapic.c"
+  },
+  {
+    "question": "seginit() 函数为每个 CPU 初始化的内核数据段，其基址和界限分别是多少？",
+    "expected_answer": "在 xv6 的扁平内存模型中，无论是内核代码段还是数据段，其基址 (Base) 全部被设为 0，段界限 (Limit) 全部被设为 4GB (0xffffffff)。这意味着分段机制实际上被“旁路”了，权限控制和保护完全交给了分页机制 (Paging) 来处理。",
+    "source_file": "vm.c"
+  },
+  {
+    "question": "当文件系统写入一个大型文件时，为什么需要拆分成多个小的事务提交？",
+    "expected_answer": "因为 xv6 的日志区域在磁盘上的大小是固定的 (通常只有几十个块)。如果一次性写入过大的数据，日志区会被撑爆导致 panic。因此 writei 在处理大文件时，必须将其拆分为不超过日志最大容量的块，在循环中反复 begin_op 和 end_op 提交多个事务。",
+    "source_file": "fs.c"
+  },
+  {
+    "question": "xv6 在实现进程阻塞 (sleep) 时，为什么不使用信号量 (Semaphore)，而是使用条件变量 (Condition Variable) 机制？",
+    "expected_answer": "xv6 的设计哲学是极简主义。sleep() 和 wakeup() 配合锁提供了一种最基础、最通用的条件变量机制。通过指定一个唯一的 chan (如进程的地址或资源的地址)，它可以轻量级地实现信号量、读写锁、管道同步等所有高级并发原语，无需在内核中额外维护复杂的信号量队列。",
+    "source_file": "proc.c"
+  },
+  {
+    "question": "内核是如何保证两个进程不会分配到同一个空闲物理页的？",
+    "expected_answer": "通过 kmem.lock 自旋锁进行全局互斥。在 kalloc() 试图从 kmem.freelist 链表中取下头节点时，必须先获取此锁；拿走页面并将链表头指针后移之后，再释放锁。这保证了在多核并发时物理页分配的绝对唯一性。",
+    "source_file": "kalloc.c"
+  },
+  {
+    "question": "xv6 的文件系统是否支持符号链接 (Symbolic Link)？",
+    "expected_answer": "不支持。xv6 的文件系统极其精简，只支持硬链接 (Hard Link，即多个目录项指向同一个 inode)。因此，xv6 无法像 Linux 那样跨越不同文件系统建立链接，也无法为目录创建硬链接以避免路径死循环。",
+    "source_file": "fs.c"
+  },
+  {
+    "question": "在 sys_exec() 替换新进程映像后，如何确保子进程从入口点开始执行，而不是返回系统调用之后的位置？",
+    "expected_answer": "sys_exec 在成功加载 ELF 后，会强制修改当前进程 trapframe 中的 eip (指令指针寄存器)。它将 eip 设为 ELF 头中指定的程序入口地址 (elf.entry)。当从 trap 通过 iret 返回用户态时，硬件会将这个新的 eip 弹入指令指针，直接跳转到新程序的第一行代码执行。",
+    "source_file": "exec.c"
+  },
+  {
+    "question": "xv6 中 mycpu() 函数是如何安全获取当前 CPU 结构体指针的？为什么要关中断？",
+    "expected_answer": "mycpu() 在读取硬件寄存器（如 %gs）前会先调用 pushcli() 关闭中断，获取完指针后再 popcli()。如果不在获取期间关中断，进程可能在刚拿到指针时就被时钟中断切走并调度到另一个 CPU 上执行，导致原本获取的 CPU 指针失效。",
+    "source_file": "proc.c"
+  },
+  {
+    "question": "exec() 系统调用在解析可执行文件时，是如何验证其合法性的？",
+    "expected_answer": "exec() 读取文件头部的 elfhdr 结构体，检查其 magic 字段是否等于 ELF_MAGIC (0x464C457F)。如果魔数不匹配，它会直接拒绝执行并返回 -1，防止内核被非 ELF 格式的乱码文件搞崩溃。",
+    "source_file": "exec.c"
+  },
+  {
+    "question": "xv6 管道 (pipe) 的内部缓冲区大小是多少？",
+    "expected_answer": "管道内部的环形缓冲区大小被宏定义为 PIPESIZE，在 xv6 中默认是 512 字节。这也是 pipewrite 在判断缓冲区是否写满时所使用的阈值。",
+    "source_file": "pipe.c"
+  },
+  {
+    "question": "当进程第一次被调度上 CPU 时，它会跳转到哪个函数执行？为什么？",
+    "expected_answer": "会跳转到 forkret()。因为 allocproc 在初始化新进程的 trapframe 和 context 时，强行将 context->eip 设置为了 forkret 的地址。forkret 会进行一些初始化释放锁的工作，然后正常返回到 trapret，最终通过 iret 进入用户态。",
+    "source_file": "proc.c"
+  },
+  {
+    "question": "系统启动后的第一个用户态程序 initcode 做了什么极其关键的操作？",
+    "expected_answer": "initcode 通过 mknod 创建了控制台设备文件 /console，然后通过连续三次调用 open 将它绑定到文件描述符 0, 1, 2（即标准输入、输出、错误）。随后它调用 exec 启动了真正的 shell 程序 (sh)。",
+    "source_file": "initcode.S"
+  },
+  {
+    "question": "copyin() 函数和 copyout() 函数的核心区别是什么？",
+    "expected_answer": "它们方向相反。copyin 用于将用户态虚拟地址空间的数据安全地拷贝到内核态缓冲区中（防范用户恶意传参）；copyout 用于将内核计算好的结果安全地拷贝回用户态指定的虚拟地址。两者都会严格检查地址是否越界 (>= p->sz)。",
+    "source_file": "vm.c"
+  },
+  {
+    "question": "x86 的 32 位虚拟地址在 xv6 中是如何被划分为哪三个部分的？",
+    "expected_answer": "虚拟地址被分为三部分：最高的 10 位是页目录索引 (PDX)，中间的 10 位是页表索引 (PTX)，最低的 12 位是页内偏移量 (OFFSET)。PDX 和 PTX 配合完成两级页表的寻址。",
+    "source_file": "mmu.h"
+  },
+  {
+    "question": "页表项 (PTE) 中的 PTE_U 和 PTE_W 标志位分别控制什么权限？",
+    "expected_answer": "PTE_U (User) 置 1 时表示允许用户态代码访问该物理页，若为 0 则只有内核态可访问。PTE_W (Writable) 置 1 时表示该页是可写的，若为 0 则是只读的（比如代码段）。",
+    "source_file": "mmu.h"
+  },
+  {
+    "question": "当发生缺页异常 (Page Fault) 时，硬件会将引发错误的虚拟地址保存在哪个寄存器中？",
+    "expected_answer": "x86 硬件会自动将导致 Page Fault 的线性（虚拟）地址存入 CR2 寄存器中。内核的 trap 函数可以通过读取 CR2 来判断出错的具体地址，但在原生 xv6 中通常直接 panic。",
+    "source_file": "x86.h"
+  },
+  {
+    "question": "CR3 寄存器中存放的是什么？",
+    "expected_answer": "CR3 寄存器（也叫页目录基址寄存器 PDBR）存放的是当前进程（或内核）最高级页目录表 (Page Directory) 的物理首地址。在上下文切换时，加载新的 CR3 就完成了地址空间的切换。",
+    "source_file": "x86.h"
+  },
+  {
+    "question": "自旋锁结构体 (struct spinlock) 中的 pcs 数组是用来干什么的？",
+    "expected_answer": "pcs 数组用于内核调试。当内核获取一把自旋锁时，它会通过读取当前 CPU 的 %ebp 寄存器来进行栈回溯 (Stack Walking)，把调用链上的几个指令地址 (EIP) 记录在 pcs 中。一旦发生死锁，可以通过打印 pcs 快速定位是哪段代码占着锁不放。",
+    "source_file": "spinlock.h"
+  },
+  {
+    "question": "pushcli() 函数为什么要维护一个 cpu->ncli 计数器，而不是直接执行 cli 指令？",
+    "expected_answer": "为了支持锁的嵌套。一个函数可能在已经持有 A 锁（已关中断）的情况下，再去获取 B 锁（再次调用 pushcli）。如果直接操作硬件，释放 B 锁时就会过早开启中断。ncli 计数器确保只有当所有嵌套的锁都释放后（ncli 降为 0），才真正 sti 开启中断。",
+    "source_file": "spinlock.c"
+  },
+  {
+    "question": "binit() 函数是如何初始化 Buffer Cache 的？",
+    "expected_answer": "binit 初始化了 bcache 的自旋锁，并将所有的 buf 结构体链接成一个双向循环链表。它将 bcache.head 作为哑节点，所有新初始化的 buf 的时间戳和设备号都被清零，表示空闲。",
+    "source_file": "bio.c"
+  },
+  {
+    "question": "bread() 和 bget() 函数的关系是什么？",
+    "expected_answer": "bget 只负责在内存中寻找或分配一个缓存块 (buf)，它不保证里面的数据是有效的。bread 则是先调用 bget，如果发现分配到的块数据无效 (B_VALID 标志未置位)，它会调用 iderw() 从磁盘读取真实数据填充到这个块中。",
+    "source_file": "bio.c"
+  },
+  {
+    "question": "当 brelse() 释放一个缓存块时，如果它带有 B_DIRTY 标志会怎样？",
+    "expected_answer": "brelse() 本身并不会将 B_DIRTY 的块立刻写回磁盘。B_DIRTY 只是个标记。真正将脏数据写入磁盘的操作必须由调用者在释放前显式调用 bwrite() 来完成；bwrite 完成后会清除 B_DIRTY 并设置 B_VALID。",
+    "source_file": "bio.c"
+  },
+  {
+    "question": "如果在文件系统事务提交 (commit) 期间系统断电崩溃，重启后 xv6 是如何恢复的？",
+    "expected_answer": "在系统启动的 fsinit 阶段，xv6 会调用 recover_from_log()。它检查日志区的头部 (log header) 的 n 字段。如果 n > 0，说明崩溃前有一个已完全写入日志区但未完全写回数据区的事务，内核会调用 install_trans 将日志块的数据强制覆盖到真实的磁盘数据块上，从而恢复一致性。",
+    "source_file": "log.c"
+  },
+  {
+    "question": "log.c 中的 write_head() 函数为什么必须是同步写入磁盘的？",
+    "expected_answer": "write_head() 将事务包含的块数量 (n) 和块号映射数组写入日志头部扇区。这是事务提交的“原子提交点 (Commit Point)”。它必须同步写回硬件，只有这个扇区成功落盘，整个事务才算被确认；如果在写入前断电，事务将被视为未发生并被丢弃。",
+    "source_file": "log.c"
+  },
+  {
+    "question": "xv6 文件系统限制单个事务最多修改多少个磁盘块？这个常数叫什么？",
+    "expected_answer": "限制为 MAXOPBLOCKS (通常是 10 个块)。这是因为磁盘上划分给日志区的物理空间（LOGSIZE = MAXOPBLOCKS * 3）是极其有限的，内核通过 begin_op 阻塞等待确保任何时刻并发的事务总块数不会超过这个阈值。",
+    "source_file": "log.h"
+  },
+  {
+    "question": "readsb() 函数的作用是什么？它读取的数据结构是什么？",
+    "expected_answer": "readsb 从磁盘的第 1 号扇区（引导区之后）读取数据，将其解析为 superblock（超级块）结构体。超级块包含了文件系统的全局元数据：总块数、数据块数、inode 数量、日志区起始块号等关键信息。",
+    "source_file": "fs.c"
+  },
+  {
+    "question": "balloc() 函数是如何在磁盘上寻找空闲数据块的？",
+    "expected_answer": "balloc 遍历所有的位图块 (Bitmap Blocks)。它将位图块读入内存，逐位 (bit) 检查。如果某个位为 0，说明对应的物理磁盘块空闲。它会将该位置 1，将位图块 bwrite 写回，并返回对应的物理盘块号。",
+    "source_file": "fs.c"
+  },
+  {
+    "question": "bfree() 函数是如何释放磁盘数据块的？",
+    "expected_answer": "bfree 接收一个设备号和盘块号。它通过数学计算找到该盘块号在位图块中对应的具体字节和位偏移。将其读入内存，使用位清除操作 (&= ~mask) 将该位清零，然后通过 bwrite 写回磁盘。",
+    "source_file": "fs.c"
+  },
+  {
+    "question": "iunlock() 和 iput() 有什么本质区别？",
+    "expected_answer": "iunlock 仅仅是释放睡眠锁 (sleeplock)，允许其他进程访问或修改这个 inode，但当前进程在内存中依然持有对它的引用。iput 则是将该 inode 的内存引用计数 (ref) 减 1，如果减到 0 且无链接，则触发磁盘截断清理。",
+    "source_file": "fs.c"
+  },
+  {
+    "question": "ilock() 函数在锁定 inode 后，为什么还需要检查 valid 标志？",
+    "expected_answer": "iget() 仅仅是在内存中分配了 inode 结构，但并没有从磁盘加载实际数据。ilock 获取睡眠锁后，检查 valid 标志。如果为 0，它必须调用 bread() 从磁盘读取 inode 数据所在的块，将字段拷贝到内存结构中，并将 valid 置 1。",
+    "source_file": "fs.c"
+  },
+  {
+    "question": "dirnext() 函数在遍历目录时，是如何判断一个目录项是空闲的？",
+    "expected_answer": "dirnext() 依次读取目录 inode 中的 struct dirent 结构体。它通过检查 dirent.inum 字段是否为 0 来判断该条目是否有效。如果为 0，说明这是个被删除或未分配的槽位，它会跳过继续读取下一个。",
+    "source_file": "fs.c"
+  },
+  {
+    "question": "sys_mkdir() 底层是如何创建目录的？",
+    "expected_answer": "sys_mkdir 并没有专门的底层函数，它直接复用了 create() 函数。它调用 create(path, T_DIR, 0, 0)，要求在指定路径分配一个新的 type 为 T_DIR 的 inode，并在新目录中自动建立 . 和 .. 这两个基础目录项。",
+    "source_file": "sysfile.c"
+  },
+  {
+    "question": "sys_chdir() 系统调用是如何改变进程工作目录的？",
+    "expected_answer": "sys_chdir 首先调用 namei() 解析目标路径获取 inode。验证其 type 必须是 T_DIR。然后锁定它，调用 idup() 增加其引用计数，释放旧的 myproc()->cwd 的引用，最后将 myproc()->cwd 指针指向这个新的目录 inode。",
+    "source_file": "sysfile.c"
+  },
+  {
+    "question": "filealloc() 分配文件结构体时，为什么要用 ftable.lock 保护？",
+    "expected_answer": "全局文件表 ftable 是所有进程共享的数据结构。如果不加锁，两个不同的进程同时执行 sys_open 时，可能会扫描到同一个 ref 为 0 的文件结构体并同时分配，导致文件状态被互相覆盖损坏。",
+    "source_file": "file.c"
+  },
+  {
+    "question": "filedup() 函数是如何增加文件引用计数的？",
+    "expected_answer": "filedup 接收一个 file 结构体指针。它首先获取 ftable.lock 进行互斥保护，然后简单地将其引用计数 f->ref 递增，随后释放锁并返回原来的文件指针。常被 fork 或 dup 系统调用使用。",
+    "source_file": "file.c"
+  },
+  {
+    "question": "pipealloc() 函数在创建管道时，为什么需要向 ftable 申请两个文件结构体？",
+    "expected_answer": "因为管道是单向字节流，需要两个端点：一个读端和一个写端。pipealloc 申请两个 file 结构体，一个配置为可读 (readable)，另一个配置为可写 (writable)，它们都指向底层同一个在物理内存中分配的 pipe 结构体。",
+    "source_file": "pipe.c"
+  },
+  {
+    "question": "在管道读取 piperead() 中，什么时候读进程会被挂起睡眠？",
+    "expected_answer": "当环形缓冲区为空时。代码表现为 pi->nread == pi->nwrite。此时如果写端还没有被关闭 (pi->writeopen)，读进程会调用 sleep(&pi->nread, &pi->lock) 让出 CPU，等待写端写入数据后将其唤醒。",
+    "source_file": "pipe.c"
+  },
+  {
+    "question": "在管道写入 pipewrite() 中，什么时候写进程会被挂起睡眠？",
+    "expected_answer": "当环形缓冲区满了的时候。由于缓冲区大小是 PIPESIZE，判断满的条件是 pi->nwrite == pi->nread + PIPESIZE。此时写进程会调用 sleep 挂起，等待读端取走数据腾出空间。",
+    "source_file": "pipe.c"
+  },
+  {
+    "question": "pipeclose() 在关闭读端时，为什么要触发 wakeup() 唤醒写端？",
+    "expected_answer": "因为此时可能有一个写进程正因为管道缓冲区满了而处于 SLEEPING 状态。如果读端被彻底关闭了，写进程就没有必要继续阻塞等待了，必须将其唤醒。写进程被唤醒后会发现 pi->readopen 为 0，从而终止写入操作。",
+    "source_file": "pipe.c"
+  },
+  {
+    "question": "tvinit() 函数在使用 SETGATE 宏初始化系统调用中断门时，它的最后一个参数 ISTRAP 被置为了 1。这表示什么？",
+    "expected_answer": "在 x86 架构中，如果门的类型是 Trap Gate (ISTRAP = 1)，那么当硬件通过该门陷入内核时，硬件不会自动清除 EFLAGS 寄存器中的 IF 位（不会自动关中断）。这意味着系统调用处理期间，xv6 允许响应硬件时钟或设备中断。",
+    "source_file": "trap.c"
+  },
+  {
+    "question": "trap() 函数中，如果在用户态发生非预期的异常 (如 Page Fault)，内核是如何处理的？",
+    "expected_answer": "trap() 会检查 tf->cs 的最低两位 (CPL)。如果发现是从用户态进入的异常 (tf->cs & 3 == 3)，内核不会直接 panic 导致整个机器重启，而是将当前进程的 myproc()->killed 标志置 1，强迫该进程在返回用户态前自己走向 exit()。",
+    "source_file": "trap.c"
+  },
+  {
+    "question": "syscall.c 中的 argint() 是如何通过寄存器获取第 n 个系统调用参数的？",
+    "expected_answer": "这是个陷阱题。在 xv6 中，系统调用参数不是通过通用寄存器传递的，而是全部压在用户栈上。argint(n, &ip) 会根据当前 trapframe 中的用户栈顶指针 tf->esp，加上偏移量 (4 + 4*n) 去用户栈中提取第 n 个 32 位整数参数。",
+    "source_file": "syscall.c"
+  },
+  {
+    "question": "userinit() 函数在系统启动时是如何伪造第一个进程的执行现场的？",
+    "expected_answer": "userinit 分配进程结构后，会在其 trapframe 中手动设置：tf->cs = 段选择子指向用户代码段加权限 3；tf->ds = es = ss = 用户数据段；tf->eip = 0 (因为 initcode 加载到了虚拟地址 0)。这样 trapret 恢复现场时就顺理成章地进入了 initcode。",
+    "source_file": "proc.c"
+  },
+  {
+    "question": "growproc(n) 中如果参数 n 为负数，内核会怎么做？",
+    "expected_answer": "如果 n 为负数，说明进程想要收缩其堆内存 (如调用 sbrk(-1024))。growproc 会调用 deallocuvm() 释放多余的物理内存页表和页面，并将进程的边界 (p->sz) 减小。",
+    "source_file": "proc.c"
+  },
+  {
+    "question": "在 xv6 系统中按下 Ctrl+P 会触发 procdump()，它是干什么的？",
+    "expected_answer": "procdump 是一个内置的调试工具。它会被键盘中断处理程序捕捉，并在控制台打印出当前系统中所有进程的状态 (如 RUNNING, SLEEPING)、PID、名字，甚至是休眠的频道地址以及进程的栈回溯信息。",
+    "source_file": "proc.c"
+  },
+  {
+    "question": "clearpteu() 函数主要用在什么场景下？",
+    "expected_answer": "主要用在 exec() 加载程序之后。为了保护用户栈底的 2 个未映射保护页 (Guard Pages) 和其他敏感数据，clearpteu 会找到对应虚拟地址的页表项，将其 PTE_U 标志位清零。这样用户态程序一旦试图访问（比如栈溢出），就会立即引发 Page Fault。",
+    "source_file": "vm.c"
+  },
+  {
+    "question": "freevm() 函数清理用户内存空间的步骤分哪两步？",
+    "expected_answer": "第一步：调用 deallocuvm(pgdir, KERNBASE, 0) 将所有用户态空间的虚拟映射解除，并释放对应的实际物理页。第二步：因为 deallocuvm 不会释放存放页表本身的那些物理页，所以 freevm 还要遍历释放页目录和二级页表自身占用的物理页。",
+    "source_file": "vm.c"
+  },
+  {
+    "question": "kbd.c 中的状态机是如何处理键盘 Shift 键长按的？",
+    "expected_answer": "键盘中断每次只会发送按下 (make) 或松开 (break) 的扫描码。kbd.c 中维护了一个 shift 静态变量。当收到 Shift 按下的扫描码时，它将 shift 变量的对应位置 1；收到松开的扫描码时将其清零。在转换 ASCII 码时，它会查阅这个变量来决定输出大小写。",
+    "source_file": "kbd.c"
+  },
+  {
+    "question": "consputc() 在处理控制台字符输出时，遇到退格符 (\\b) 会怎么操作显存？",
+    "expected_answer": "CGA 显存直接映射在物理地址 0xB8000。遇到 \\b 时，consputc 会将显存的光标位置 (crt) 减 1 退回前一个字符，然后向该位置写入一个带有黑底白字属性的空格字符 (0x0700 | ' ')，从而实现擦除效果。",
+    "source_file": "console.c"
+  },
+  {
+    "question": "内核中的 cprintf() 相比于标准 C 库的 printf() 缺少了什么功能？",
+    "expected_answer": "xv6 的 cprintf 是极度精简版。它只支持 %d (十进制), %x (十六进制), %p (指针), %s (字符串) 这四种格式化字符，它不支持浮点数打印，不支持复杂的宽度格式对齐 (如 %04d)，因为内核中不需要这些复杂的文本操作。",
+    "source_file": "console.c"
+  },
+  {
+    "question": "在单核兼容的 8259A PIC 架构下，主片和从片是通过哪个 IRQ 级联在一起的？",
+    "expected_answer": "主从 PIC 通过主片的 IRQ 2 进行级联。初始化时，xv6 的 picinit() 会向主片的端口写入配置命令，告知其 IRQ 2 上连接着从片，所有发往从片的硬件中断都会通过这根线路由到 CPU。",
+    "source_file": "picirq.c"
+  },
+  {
+    "question": "lapicw() 函数是如何对 Local APIC 进行寄存器写入的？",
+    "expected_answer": "LAPIC 的寄存器并不是通过 x86 的 inb/outb I/O 端口访问的，而是通过内存映射 I/O (MMIO)。内核启动时建立了一个指向物理地址 0xFEE00000 的虚拟页指针 lapic。lapicw 通过对该指针的偏移量直接赋值内存，即可实现向硬件寄存器写指令。",
+    "source_file": "lapic.c"
+  },
+  {
+    "question": "在外部硬件中断处理完毕后，trap() 函数为什么必须调用 lapicw(EOI, 0)？",
+    "expected_answer": "EOI 代表 End of Interrupt。如果不向 LAPIC 的 EOI 寄存器写入信号，LAPIC 会认为当前中断还没有被处理完毕，从而拒绝向 CPU 派发任何后续的同级或低级硬件中断，导致系统外设假死。",
+    "source_file": "lapic.c"
+  },
+  {
+    "question": "ioapic.c 中的 ioapicenable() 是如何将键盘中断路由到特定 CPU 的？",
+    "expected_answer": "ioapicenable 接收中断源引脚 (irq) 和目标 CPU 的 apicid。它计算出对应的重定向表项 (Redirection Table) 的两个 32 位寄存器地址。在低 32 位中配置触发模式和中断向量号 (T_IRQ0 + irq)，在高 32 位中写入目标 apicid，从而完成精准路由。",
+    "source_file": "ioapic.c"
+  },
+  {
+    "question": "xv6 在多核启动时，是如何在内存中找到 MP 规范配置表的？",
+    "expected_answer": "mp.c 中的 mpsearch() 函数会扫描物理内存。它主要在扩展 BIOS 数据区 (EBDA) 的前 1KB、物理内存顶部的最后 1KB、以及 0xF0000~0xFFFFF 这段 BIOS ROM 区寻找 '_MP_' 这个 4 字节的魔数签名。",
+    "source_file": "mp.c"
+  },
+  {
+    "question": "getcallerpcs() 函数实现内核调用栈回溯的核心思路是什么？",
+    "expected_answer": "x86 架构下的函数调用约定中，每个栈帧的基址指针寄存器 (%ebp) 保存着上一个栈帧的 %ebp 地址，而 %ebp+4 的位置保存着函数返回地址 (EIP)。getcallerpcs 通过一个循环，不断解引用当前的 ebp 来追溯上层函数的 ebp，并提取 ebp+4 的指令地址打印出来。",
+    "source_file": "spinlock.c"
+  },
+  {
+    "question": "为什么 acquiresleep() 在执行过程中必须被自旋锁 lk->lk 保护？",
+    "expected_answer": "睡眠锁的底层是由自旋锁保护的。如果在判断 lk->locked == 1 并准备进入 sleep() 的间隙不加自旋锁保护，另一个持有该睡眠锁的进程刚好释放了它并调用了 wakeup，当前进程就会错过唤醒信号从而永久沉睡 (Lost Wakeup)。",
+    "source_file": "sleeplock.c"
+  },
+  {
+    "question": "releasesleep() 在释放睡眠锁后，调用 wakeup(lk) 唤醒的是谁？",
+    "expected_answer": "它唤醒所有在 acquiresleep() 中调用了 sleep(lk, &lk->lk) 的进程。这些等待锁的进程被唤醒变为 RUNNABLE，等被调度上 CPU 后，它们会重新参与 while(lk->locked) 的循环竞争，只有第一个抢到的进程能往下执行。",
+    "source_file": "sleeplock.c"
+  },
+  {
+    "question": "sys_mknod() 创建的设备文件，与普通文件在 inode 属性上有什么关键不同？",
+    "expected_answer": "设备文件不占用磁盘数据块来存储内容。它的 inode 的 type 字段被设置为 T_DEV。更重要的是，它利用 inode 的 major 和 minor 字段来存储主设备号和次设备号。当用户对其进行读写时，文件系统会根据 major 号直接路由到内核的特定设备驱动程序 (如控制台)。",
+    "source_file": "sysfile.c"
+  },
+  {
+    "question": "系统启动初期，开启 A20 地址线的历史包袱代码在哪？原理是什么？",
+    "expected_answer": "在 bootasm.S 中。早期的 8086 只有 20 根地址线，地址溢出时会自动回绕。为了兼容，后来的 CPU 默认禁用了第 21 根地址线 (A20)。bootasm.S 会通过向键盘控制器 (端口 0x64 和 0x60) 发送特殊指令，硬件拉高 A20 信号线，从而突破 1MB 内存寻址限制进入 32 位空间。",
+    "source_file": "bootasm.S"
+  },
+  {
+    "question": "waitdisk() 函数在 IDE 磁盘驱动中，是如何判断磁盘控制器发生了错误的？",
+    "expected_answer": "waitdisk 在轮询状态寄存器 0x1F7 时，除了检查 BSY (Busy) 和 RDY (Ready) 标志位之外，还会检查 DF (Device Fault，第 5 位) 和 ERR (Error，第 0 位)。如果这两个位中的任意一个被置 1，说明硬件发生了不可恢复的异常，通常内核会直接 panic。",
+    "source_file": "ide.c"
+  },
+  {
+    "question": "xv6 的用户态 init 进程 (init.c) 的主循环在干什么？",
+    "expected_answer": "init 进程在一个死循环中调用 wait()。它的主要职责是作为系统中所有孤儿进程（父进程已死）的“养父”，负责回收它们退出后留下的 ZOMBIE 状态，防止系统进程表被僵尸进程撑爆。",
+    "source_file": "init.c"
+  },
+  {
+    "question": "xv6 的 shell (sh.c) 是如何实现输出重定向 (>) 的？",
+    "expected_answer": "当 shell 解析到 '>' 时，它会 fork 一个子进程。子进程先调用 close(1) 关闭标准输出，然后调用 open(file, O_WRONLY|O_CREATE) 打开目标文件。由于 xv6 总是分配当前最小可用的文件描述符，新打开的文件刚好会占用 fd 1。随后调用 exec 执行命令，输出自然就写进了文件。",
+    "source_file": "sh.c"
+  },
+  {
+    "question": "shell (sh.c) 中是如何实现管道符 (|) 将两个命令连接起来的？",
+    "expected_answer": "shell 调用 pipe(p) 创建一个管道。然后 fork 两个子进程：左边的子进程 close(1) 并 dup(p[1]) 将标准输出绑到管道写端；右边的子进程 close(0) 并 dup(p[0]) 将标准输入绑到管道读端。最后两个子进程分别关掉多余的管道 fd 并 exec 执行对应的命令。",
+    "source_file": "sh.c"
+  },
+  {
+    "question": "用户态的 malloc() (umalloc.c) 采用的是什么内存分配算法？",
+    "expected_answer": "umalloc 使用了 K&R (Kernighan & Ritchie) 经典的“首次适应” (First-Fit) 算法。它维护了一个由空闲块组成的环形单向链表 (freelist)，每次分配时从当前位置遍历，找到第一个大小满足要求的块进行切割分配。",
+    "source_file": "umalloc.c"
+  },
+  {
+    "question": "当 umalloc.c 中的 freelist 没有足够大的空闲块时，它会如何向内核申请内存？",
+    "expected_answer": "它会调用 morecore() 函数。morecore 底层调用了 xv6 的 sbrk() 系统调用，向内核请求增加进程的堆空间。获取到新的内存页后，将其构造成一个 Header 并通过 free() 函数插入到当前的 freelist 链表中。",
+    "source_file": "umalloc.c"
+  },
+  {
+    "question": "umalloc.c 中的 Header 结构体为什么包含一个指向下一个空闲块的指针和一个大小 (size) 字段？",
+    "expected_answer": "因为 umalloc 需要管理变长的内存块。size 字段记录了当前块包含多少个 Header 单位的内存，用于判断是否满足分配请求以及 free 时的合并；指针则用于将所有散落的空闲块串联成链表以便遍历。",
+    "source_file": "umalloc.c"
+  },
+  {
+    "question": "用户态的 free() 函数在释放内存时，如何防止内存碎片的产生？",
+    "expected_answer": "free() 在将内存块插回 freelist 时，会检查它与物理地址相邻的前一个块和后一个块是否也是空闲的。如果是，它会将连续的空闲块合并 (Merge) 成一个更大的块，从而有效缓解内存碎片化。",
+    "source_file": "umalloc.c"
+  },
+  {
+    "question": "用户程序是如何触发系统调用的？usys.S 文件有什么作用？",
+    "expected_answer": "usys.S 包含了所有系统调用的用户态汇编存根 (Stubs)。它利用宏 SYSCALL 定义了每个函数。当用户调用 read() 时，存根会将 SYS_read 的编号放入 eax 寄存器，然后执行 int $T_SYSCALL (int 64) 触发软中断陷入内核。",
+    "source_file": "usys.S"
+  },
+  {
+    "question": "为什么 xv6 的 printf.c (用户态) 不直接复用内核的 cprintf()？",
+    "expected_answer": "因为内核态和用户态的运行环境与权限完全不同。内核的 cprintf 直接操作 CGA 显存和串口硬件，而用户态程序没有权限访问底层硬件，它的 printf 必须将格式化好的字符流通过 write(1, ...) 系统调用输出到文件描述符 1 (标准输出)。",
+    "source_file": "printf.c"
+  },
+  {
+    "question": "param.h 中的 NPROC 宏代表什么？它对系统有什么直接影响？",
+    "expected_answer": "NPROC (默认 64) 定义了 xv6 系统中同时存在的最大进程数。它直接决定了内核中 ptable.proc 数组的大小。如果系统中活跃进程达到 64 个，后续的 fork() 将因为找不到空闲槽位而直接失败。",
+    "source_file": "param.h"
+  },
+  {
+    "question": "内核栈的大小被宏 KSTACKSIZE 定义为多大？为什么不分配得更大？",
+    "expected_answer": "KSTACKSIZE 被定义为 4096 字节 (4KB，即一页)。xv6 的内核设计非常精简，内核函数调用链很浅，且几乎不在栈上分配大型数组或结构体。4KB 足以应对所有的系统调用和中断处理，再大纯属浪费物理内存。",
+    "source_file": "param.h"
+  },
+  {
+    "question": "mmu.h 中的 DPL_USER 和 DPL_KERN 分别代表什么意思？",
+    "expected_answer": "DPL 代表描述符特权级 (Descriptor Privilege Level)。DPL_KERN (0) 是最高特权级，即 Ring 0，属于内核；DPL_USER (3) 是最低特权级，即 Ring 3，属于用户态程序。硬件通过对比 CPL 和 DPL 来进行内存和端口访问的权限拦截。",
+    "source_file": "mmu.h"
+  },
+  {
+    "question": "段描述符中的 STA_W 和 STA_R 标志有什么区别？",
+    "expected_answer": "STA_W (Writable) 用于数据段描述符，表示该段内存不仅可读，还允许写入（例如用户的全局变量区）。STA_R (Readable) 用于代码段描述符，表示该代码段可以被读取（用于执行指令），但绝对不能被写入。",
+    "source_file": "mmu.h"
+  },
+  {
+    "question": "x86.h 中的 lcr3() 内联汇编函数做了什么？执行它会导致什么硬件行为？",
+    "expected_answer": "lcr3() 执行汇编指令 movl val, %cr3，用于将新的页目录基址加载到 CR3 寄存器中。执行这条指令不仅会切换虚拟地址空间，硬件还会自动刷新 TLB (转换后备缓冲器) 中所有非全局的缓存项，强制重新进行页表遍历。",
+    "source_file": "x86.h"
+  },
+  {
+    "question": "x86.h 中的 readeflags() 函数的作用是什么？",
+    "expected_answer": "它通过 pushfl 和 popl 汇编指令将 EFLAGS 寄存器的当前值读取到 C 语言变量中。内核常用它来检查 FL_IF 位，从而判断在调用某些函数前，当前 CPU 的中断到底是处于开启还是关闭状态。",
+    "source_file": "x86.h"
+  },
+  {
+    "question": "ELF 文件头 (elfhdr) 中的 e_phoff 字段指向哪里？",
+    "expected_answer": "e_phoff (Program Header Offset) 记录了程序头表 (Program Header Table) 在 ELF 文件内部的字节偏移量。内核的 exec() 函数通过它找到程序头表，从而知道需要把哪些段 (如 .text, .data) 加载到内存的什么位置。",
+    "source_file": "elf.h"
+  },
+  {
+    "question": "程序头结构体 (proghdr) 中的 p_memsz 和 p_filesz 有什么区别？为什么 p_memsz 可能大于 p_filesz？",
+    "expected_answer": "p_filesz 是该段在 ELF 文件中实际占用的字节数；p_memsz 是该段加载到内存后需要占用的字节数。对于 BSS 段（未初始化的全局变量），它在文件中不占空间 (filesz=0)，但在内存中需要预留空间并清零，此时 memsz 就会大于 filesz。",
+    "source_file": "elf.h"
+  },
+  {
+    "question": "ELF 的魔数 (Magic Number) 是哪四个字节？它的作用是什么？",
+    "expected_answer": "ELF 魔数是 0x7F, 'E', 'L', 'F' (在内存中体现为 0x464C457F)。内核在加载可执行文件前会严格校验这四个字节，这是判断文件是否为合法可执行二进制格式的第一道也是最快速的防线。",
+    "source_file": "elf.h"
+  },
+  {
+    "question": "exec() 加载 ELF 文件时，如果 ph.vaddr 不是页对齐的会怎样？",
+    "expected_answer": "xv6 的 exec() 实现非常严格。如果它发现程序头中指定的虚拟加载地址 (ph.vaddr) 无法被 PGSIZE (4096) 整除，它会直接跳转到 bad 标签，中止加载并返回错误。这意味着 xv6 编译器生成的二进制必须严格按页对齐。",
+    "source_file": "exec.c"
+  },
+  {
+    "question": "当 exec() 成功设置了用户栈并压入了参数后，它是如何更新进程大小的？",
+    "expected_answer": "exec 先用 sz 记录了代码段和数据段占据的虚拟地址大小。在分配并映射用户栈 (2页) 之后，它不会修改全局的 p->sz，而是将局部的 sz 更新为旧的 sz 加上 2 个页的大小，最后将这个新的 sz 赋值给 p->sz 完成边界更新。",
+    "source_file": "exec.c"
+  },
+  {
+    "question": "sys_uptime() 系统调用是如何获取系统运行时间的？",
+    "expected_answer": "内核中维护了一个全局变量 ticks，每次时钟中断 (IRQ_TIMER) 发生时，trap() 会将其加 1。sys_uptime 获取 tickslock 自旋锁后，直接读取并返回 ticks 的值。这是 xv6 中极其简陋但有效的时间度量方式。",
+    "source_file": "sysproc.c"
+  },
+  {
+    "question": "在 sysproc.c 中，sys_sleep() 的传入参数 n 代表什么？它和 ticks 有什么关系？",
+    "expected_answer": "参数 n 代表进程希望休眠的“时钟滴答数”。sys_sleep 首先记录当前的 ticks 为 ticks0，然后进入一个 while 循环。只要 (ticks - ticks0 < n)，它就调用 sleep(&ticks, &tickslock) 挂起自己，直到时钟中断唤醒它并检查条件满足后退出循环。",
+    "source_file": "sysproc.c"
+  },
+  {
+    "question": "xv6 中，打开文件的数量受到什么限制？",
+    "expected_answer": "受到两重限制：一是宏 NOFILE (默认 16)，限制了单个进程最多同时打开的文件数量；二是宏 NFILE (默认 100)，限制了整个系统全局文件表 ftable 中最多同时存在的被打开文件结构体总数。",
+    "source_file": "param.h"
+  },
+  {
+    "question": "文件系统常数 FSMAGIC (0x10203040) 的作用是什么？",
+    "expected_answer": "FSMAGIC 被存储在磁盘超级块 (superblock) 的 magic 字段中。内核在启动时读取超级块，如果发现魔数不匹配，内核会 panic，提示磁盘未被正确格式化为 xv6 文件系统格式。",
+    "source_file": "fs.h"
+  },
+  {
+    "question": "磁盘上的 inode (struct dinode) 的大小是多少？一个 512 字节的扇区能装下几个？",
+    "expected_answer": "struct dinode 的大小被定义为 64 字节 (包含类型、链接数、大小和 13 个块号指针)。因为盘块大小 BSIZE 是 512 字节，所以一个扇区正好可以容纳 IPB (Inodes Per Block) 个，即 512 / 64 = 8 个 inode。",
+    "source_file": "fs.h"
+  },
+  {
+    "question": "在 stat.h 中，T_DIR, T_FILE, T_DEV 分别代表什么文件类型？",
+    "expected_answer": "T_DIR (1) 代表目录文件；T_FILE (2) 代表普通数据文件；T_DEV (3) 代表设备文件（例如控制台终端）。这些类型被存储在 inode 的 type 字段中，用于指导文件系统不同的处理逻辑。",
+    "source_file": "stat.h"
+  },
+  {
+    "question": "fcntl.h 中的 O_RDONLY, O_WRONLY, O_RDWR 是互斥的吗？在 open 系统调用中如何处理？",
+    "expected_answer": "是的，它们定义为 0, 1, 2，是互斥的读写模式标志。sys_open 在分配文件结构体时，会使用按位与操作 (omode & O_ACCMODE) 提取出这三种模式之一，并分别设置文件结构体 f->readable 和 f->writable 的布尔状态。",
+    "source_file": "fcntl.h"
+  },
+  {
+    "question": "为什么 sys_open 在创建新文件 (O_CREATE) 时，必须调用 begin_op() 和 end_op()？",
+    "expected_answer": "因为创建文件是一个涉及到多个磁盘写入操作的复杂事务。它需要分配新的 inode (修改 inode 块)、在父目录中追加新的目录项 (修改数据块)、更新父目录的大小。必须使用日志事务将这些操作打包，防止断电导致出现孤儿 inode。",
+    "source_file": "sysfile.c"
+  },
+  {
+    "question": "sys_dup() 系统调用是如何“复制”文件描述符的？",
+    "expected_answer": "sys_dup 接收一个旧的 fd，通过 argfd 验证其合法性并获取对应的 file 结构体。然后它调用 fdalloc() 在当前进程的 ofile 数组中寻找一个新的空闲 fd，最后调用 filedup() 增加文件引用计数，并将新 fd 指向该结构体并返回。",
+    "source_file": "sysfile.c"
+  },
+  {
+    "question": "当 sys_read 读取管道时，底层是如何交互的？",
+    "expected_answer": "sys_read 解析出 fd 对应的 file 结构体后调用 fileread()。由于文件类型是 FD_PIPE，它将控制权转交给 piperead()。piperead 获取管道锁，循环读取环形缓冲区中的字符拷贝到用户空间，读完后调用 wakeup() 唤醒可能正在等待写入的写进程。",
+    "source_file": "sysfile.c"
+  },
+  {
+    "question": "系统启动时 main.c 中的 kvmalloc() 做了什么核心工作？",
+    "expected_answer": "kvmalloc() 调用 setupkvm() 为内核构建了最初的全局页目录表 (kpgdir)。它将外设 I/O 空间、内核代码和数据、以及物理内存的映射预先填入这个页目录中，然后调用 switchkvm() 将其加载到 CR3，正式开启了分页机制。",
+    "source_file": "main.c"
+  },
+  {
+    "question": "main.c 中为什么要求在启动 AP (辅助处理器) 之前，BSP (主处理器) 必须完成大部分初始化？",
+    "expected_answer": "因为在 SMP 架构中，只有一个 CPU (主处理器) 负责唤醒整个系统。它必须先将内存分配器 (kinit)、文件系统和进程表初始化完毕。如果 AP 启动过早，它们可能会访问未初始化的锁或内存链表，导致内核严重崩溃。",
+    "source_file": "main.c"
+  },
+  {
+    "question": "mp.h 中定义的 MP 浮点指针结构 (mp) 和配置表头 (mpconf) 的主要作用是什么？",
+    "expected_answer": "这些结构体严格遵循 Intel 的多处理器规范。xv6 通过将内存中的字节直接强转为这些结构体指针，来解析出总线上到底挂载了多少个 LAPIC (代表 CPU 核心数) 和 IOAPIC，从而完成多核拓扑的发现。",
+    "source_file": "mp.h"
+  },
+  {
+    "question": "kbd.h 中的宏 C(x) (例如 C('D')) 是如何将字符转换为控制字符的？",
+    "expected_answer": "宏 C(x) 的定义是 ((x) - '@')。在 ASCII 码表中，控制字符 (0-31) 刚好排列在 '@' (64) 和大写字母之前。例如 'D' 的 ASCII 是 68，C('D') 计算结果为 4，这正是 Ctrl+D 的标准控制码。",
+    "source_file": "kbd.h"
+  },
+  {
+    "question": "kbd.c 是如何处理 Caps Lock (大写锁定) 键的？",
+    "expected_answer": "键盘中断程序维护了一个 toggle 状态变量。当检测到 Caps Lock 键被按下时，它会翻转 toggle 变量中的 CAPS 标志位。在后续字符映射时，如果 CAPS 位被置 1，它会将小写字母转换为大写，再次按下则恢复原样。",
+    "source_file": "kbd.c"
+  },
+  {
+    "question": "uart.c 中串口初始化的波特率被设置为了多少？它是如何被硬件分频的？",
+    "expected_answer": "默认波特率通常初始化为 9600 或 115200。uartinit() 通过向除数锁存寄存器 (DLL 和 DLM) 写入特定的分频系数来实现。例如，串口基准时钟通常是 115200 Hz，写入除数 1 就得到 115200 波特率。",
+    "source_file": "uart.c"
+  },
+  {
+    "question": "在终端实现 (console.c) 中，为什么用户的输入会被存放在 input.buf 中，直到按下回车键才返回给 sys_read？",
+    "expected_answer": "xv6 实现了经典的“规范模式” (Canonical Mode) 终端。这意味着用户在按下回车之前，可以在终端上自由使用退格键 (Backspace) 修改错字。只有当输入 '\\n' 或 EOF 时，缓冲的一整行才会被提交并唤醒等待读取的进程。",
+    "source_file": "console.c"
+  },
+  {
+    "question": "console.c 中的 consputc() 函数是如何处理换行符 '\\n' 的？",
+    "expected_answer": "当要向屏幕输出 '\\n' 时，consputc 不会只打印一个字符。它会将当前显存光标 (crt) 的位置加上刚好足够到达下一行行首的偏移量（通常是加上 80 减去 (crt % 80)），从而实现光标的精准换行。",
+    "source_file": "console.c"
+  },
+  {
+    "question": "cprintf() 函数在解析格式化字符串时，如果遇到未知的占位符 (如 %z) 会发生什么？",
+    "expected_answer": "xv6 的 cprintf 极其粗暴且健壮。如果遇到无法识别的格式化字符，它不会崩溃，而是直接按原样打印出 '%' 和那个未知的字符 'z'，然后继续解析后面的字符串。",
+    "source_file": "console.c"
+  },
+  {
+    "question": "kalloc.c 中的 kinit1() 和 kinit2() 为什么要分两次初始化物理内存？",
+    "expected_answer": "kinit1() 发生在使用 4MB 巨大页的早期启动阶段，此时内核只映射了前 4MB 的物理内存，所以它只把 0 到 4MB 之间的空闲页加入链表。等到 setupkvm() 建立了完整的页表后，kinit2() 才会被调用，将 4MB 到 PHYSTOP (通常是 224MB) 之间的剩余所有物理页全部挂载到空闲链表上。",
+    "source_file": "main.c"
+  },
+  {
+    "question": "kmem 结构体中的 use_lock 标志位起什么作用？",
+    "expected_answer": "在系统极早期启动阶段 (kinit1)，多核机制还没拉起，自旋锁的硬件机制也没完全就绪。此时 use_lock 为 0，kalloc 分配内存时不加锁。等到 kinit2() 执行时，系统已稳定，use_lock 被置为 1，从此以后所有的内存分配和释放都严格遵守自旋锁互斥。",
+    "source_file": "kalloc.c"
+  },
+  {
+    "question": "vm.c 中的 walkpgdir 函数如果发现一级页目录项 (PDE) 不存在，且 alloc==1，它不仅分配了新页，还设置了什么权限？",
+    "expected_answer": "它将新分配的物理页清零后，将该物理地址填入页目录项，并强制默认设置 PTE_P (存在), PTE_W (可写) 和 PTE_U (用户可访问) 这三个标志位。具体的读写特权控制留给最底层的二级页表项 (PTE) 来严格限制。",
+    "source_file": "vm.c"
+  },
+  {
+    "question": "copyuvm() 在复制父进程页表给子进程时，为什么子进程得到的物理页权限和父进程一模一样？",
+    "expected_answer": "copyuvm 会遍历父进程的有效 PTE，提取其物理地址的低 12 位（这 12 位包含了 PTE_W, PTE_U 等所有权限标志）。在为子进程分配新物理页并 mappages 映射时，它直接使用从父进程提取的这一模一样的权限标志进行配置。",
+    "source_file": "vm.c"
+  },
+  {
+    "question": "如果在用户程序中恶意传入一个极其庞大的指针地址给系统调用，内核如何防御？",
+    "expected_answer": "内核中的 fetchint, fetchstr 和 copyin 等所有从用户态读取数据的接口，都会将传入的虚拟地址 (addr) 与当前进程的大小 (myproc()->sz) 进行严格的大小比较。如果 addr >= p->sz，或者 addr + length 越界，操作会被立即拒绝返回 -1。",
+    "source_file": "syscall.c"
+  },
+  {
+    "question": "sys_exec() 调用成功后，为什么它的返回值有点“特殊”？",
+    "expected_answer": "在正常情况下，系统调用通过修改 trapframe 中的 eax 寄存器来返回值。但 exec 如果执行成功，它不会返回给原本调用它的代码，而是直接跳到了新 ELF 文件的入口点执行。所以对于成功的 exec，代码里写的是返回 0，但实际上这句代码对用户态不可见；只有失败时，它才会真正返回 -1。",
+    "source_file": "sysfile.c"
+  },
+  {
+    "question": "swtch.S 汇编函数中，为什么要显式地将 %esp 寄存器保存到 old 的解引用地址中？",
+    "expected_answer": "在上下文切换时，`struct context` 结构体的指针被作为参数传入。swtch 执行的第一部分任务，就是把当前的栈底 (%esp) 也就是刚刚把一堆通用寄存器压好栈的最终位置，存入到 `old` (当前进程/调度器的 context 指针) 所指向的内存变量中，以此“冻结”当前状态。",
+    "source_file": "swtch.S"
+  },
+  {
+    "question": "swtch.S 中，它是如何恢复新进程的上下文的？",
+    "expected_answer": "它将 `new` 参数 (新进程的 context 指针) 里面存的栈地址，直接赋值给硬件栈寄存器 `%esp`。这相当于完成了“移魂大法”。接下来的几条 pop 指令，弹出的就已经是新进程之前保存的 edi, esi, ebx, ebp 了。",
+    "source_file": "swtch.S"
+  },
+  {
+    "question": "proc.c 中的 kill() 函数如果试图杀死一个正处于 SLEEPING 状态的进程，它的状态会被修改为什么？",
+    "expected_answer": "会被立刻修改为 RUNNABLE。这是为了强制让那个本该挂起的进程能够被调度上 CPU。一旦它开始运行，不管是在 trap() 还是在系统调用返回前，内核都会检查到 killed 标志被置 1，从而强制其跳转到 exit() 走向死亡。",
+    "source_file": "proc.c"
+  },
+  {
+    "question": "为什么 xv6 的 fork() 必须复制父进程的所有打开的文件描述符 (fd)？",
+    "expected_answer": "这是 Unix 操作系统的核心语义约定。它允许父进程先打开管道或重定向标准输入输出，然后 fork 子进程，接着子进程执行 exec()。由于 fd 被完美继承，新程序无需任何修改就能直接通过重定向好的 fd 进行通信，这是 Shell 实现管道和重定向的基础。",
+    "source_file": "proc.c"
+  },
+  {
+    "question": "file.c 中的 stat 结构体是如何做到对底层的 inode 信息进行抽象的？",
+    "expected_answer": "stat 结构体抛弃了直接的磁盘块地址，而是将其精简为对用户有用的抽象元数据：文件类型 (type)，主次设备号 (dev)，文件系统内部节点号 (ino)，硬链接数 (nlink)，以及文件逻辑字节大小 (size)。",
+    "source_file": "stat.h"
+  },
+  {
+    "question": "fs.c 中的 namei() 解析路径时，如果是以 '/' 开头的绝对路径，它从哪里开始解析？",
+    "expected_answer": "如果是绝对路径，namei 会调用 iget(ROOTDEV, ROOTINO) 获取文件系统的根目录 inode (inode 号固定为 1)。如果是相对路径，它会获取当前进程的 myproc()->cwd 作为起点进行逐层路径切分和解析。",
+    "source_file": "fs.c"
+  },
+  {
+    "question": "在 xv6 的文件系统中，如果一个文件名超过了 DIRSIZ (14 字节) 会怎样？",
+    "expected_answer": "xv6 的目录结构非常老派。一个 struct dirent 只有 16 字节，其中 2 字节是 inum，剩下 14 字节是 name。如果用户尝试创建超过 14 字节的文件名，系统不会崩溃，但底层只会截取前 14 个字符进行保存和比对。",
+    "source_file": "fs.h"
+  },
+  {
+    "question": "fs.c 中，当文件系统需要在磁盘上找到日志区 (Log Area) 的位置时，它是怎么知道的？",
+    "expected_answer": "在 fsinit() 初始化时，内核会读取磁盘超级块 (superblock)。超级块内部的 logstart 字段明确记录了日志区在整个磁盘上的物理起始扇区号，通常位于超级块和位图块之后、inode 区域之前。",
+    "source_file": "fs.c"
+  },
+  {
+    "question": "log.c 中的 commit() 函数是如何将事务真正在磁盘上落地的？分为哪四步？",
+    "expected_answer": "分四步：1. write_log() 将内存中修改过的块追加写入磁盘日志区。 2. write_head() 更新日志头部表明事务就绪 (原子提交点)。 3. install_trans() 将日志区的内容搬运覆盖到它们最终真实的磁盘数据区。 4. 最后再次 write_head() 将日志头部计数清零，标记日志区可用。",
+    "source_file": "log.c"
+  },
+  {
+    "question": "ide.c 中的 idestart() 函数中，为什么每次发送硬件命令前都要调用 idewait()？",
+    "expected_answer": "因为 IDE 控制器可能还在处理上一个微观状态，或者总线不稳定。idewait() 是一个极其短暂的轮询等待。在每次 outb 写寄存器（特别是写入命令前），确认控制器的 BUSY 位已经清零，可以极大程度防止因时序冲突导致的设备挂死。",
+    "source_file": "ide.c"
+  },
+  {
+    "question": "如果用户程序陷入了死循环 (如 while(1);)，xv6 的内核是如何把它从 CPU 上踢下来的？",
+    "expected_answer": "依靠硬件时钟中断。APIC 硬件会每秒触发成百上千次 IRQ_TIMER 中断。这会强行打断死循环并陷入 trap()。在 trap() 中检查到如果是时钟中断且当前运行在用户态，内核会强制调用 yield()，将该进程状态设为 RUNNABLE 并触发进程调度。",
+    "source_file": "trap.c"
+  },
+  {
+    "question": "spinlock.c 中的 pushcli 为什么要检查 readeflags() & FL_IF？",
+    "expected_answer": "在关闭中断前，pushcli 需要知道在此之前中断究竟是开着还是关着的。它读取 EFLAGS 的中断标志位 (FL_IF) 并记录在当前 CPU 的 cpu->intena 变量中。这样在后续调用 popcli 时，如果嵌套深度 ncli 归零，内核就能根据 intena 的历史记录，准确地恢复原来的中断状态，而不是盲目开启。",
+    "source_file": "spinlock.c"
+  },
+  {
+    "question": "proc.c 中的 pinit() 初始化了什么锁？为什么这么早就初始化？",
+    "expected_answer": "pinit() 初始化了全局进程表锁 (ptable.lock)。这是因为进程调度是内核的心脏，紧接着的 userinit() 就需要在这个进程表中分配第一个槽位并修改状态。如果不提前把锁备好，多核启动时第一个进程的创建就会引发竞态条件。",
+    "source_file": "proc.c"
+  },
+  {
+    "question": "sysfile.c 中的 sys_read 和 sys_write 返回值的意义是什么？",
+    "expected_answer": "如果操作成功，它们返回实际读取或写入的字节数。由于管道空或文件到达末尾 (EOF) 等原因，实际处理的字节数可能小于用户请求的长度。如果底层发生非法参数或严重错误，它们会返回 -1 向用户态报错。",
+    "source_file": "sysfile.c"
+  },
+  {
+    "question": "内核中的 myproc() 函数是如何工作的？如果在调度器上下文中调用会怎样？",
+    "expected_answer": "myproc() 先关中断获取当前 CPU (mycpu())，然后返回该 CPU 结构体中记录的 proc 指针。如果在没有进程运行的纯调度器上下文中 (比如 scheduler 函数的死循环里) 调用它，它会返回 NULL (0)，如果不加以判断直接解引用会立刻导致内核 Panic。",
+    "source_file": "proc.c"
+  }
+]
